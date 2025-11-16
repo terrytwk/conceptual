@@ -1,10 +1,10 @@
 "use client"
 
 import { motion } from "framer-motion"
-import type { HTMLAttributes, ReactNode } from "react"
+import type { ReactNode, ComponentPropsWithoutRef } from "react"
 
-interface AnimatedSectionProps extends HTMLAttributes<HTMLDivElement> {
-  children: ReactNode
+interface AnimatedSectionProps extends Omit<ComponentPropsWithoutRef<"div">, "onDrag" | "onDragStart" | "onDragEnd" | "onAnimationStart" | "onAnimationEnd"> {
+  children?: ReactNode
   delay?: number
 }
 

@@ -1,6 +1,14 @@
 import Image from "next/image"
 
-export const testimonials = [
+interface Testimonial {
+  quote: string
+  name: string
+  company: string
+  avatar: string
+  type: string
+}
+
+export const testimonials: Testimonial[] = [
   {
     quote:
       "Modern codebases are often so illegible that even small changes risk breaking hidden behavior. Our work shows that structuring systems as independent concepts plus synchronizations makes backends far more modular, explainable, and amenable to LLM-based generation.",
@@ -143,7 +151,7 @@ const _testimonials = [
   },
 ]
 
-const TestimonialCard = ({ quote, name, company, avatar, type }) => {
+const TestimonialCard = ({ quote, name, company, avatar, type }: Testimonial) => {
   const isLargeCard = type.startsWith("large")
   const avatarSize = isLargeCard ? 48 : 36
   const avatarBorderRadius = isLargeCard ? "rounded-[41px]" : "rounded-[30.75px]"
