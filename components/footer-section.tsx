@@ -12,7 +12,7 @@ export function FooterSection() {
         </div>
         <p className="text-foreground/90 text-sm font-medium leading-[18px] text-left">Backend dev made effortless</p>
         <div className="flex justify-start items-start gap-3">
-          <a href="#" aria-label="GitHub" className="w-4 h-4 flex items-center justify-center">
+          <a href="https://github.com/terrytwk/conceptual" aria-label="GitHub" className="w-4 h-4 flex items-center justify-center">
             <Github className="w-full h-full text-muted-foreground" />
           </a>
         </div>
