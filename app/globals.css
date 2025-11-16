@@ -1,27 +1,92 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* Define color design tokens for light and dark modes */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 210 11% 7%; /* #0f1211 */
+  --foreground: 160 14% 93%; /* #e7eceb */
+  --muted: 240 2% 16%; /* #27272a */
+  --muted-foreground: 160 14% 93% / 0.7; /* rgba(231, 236, 235, 0.7) */
+  --muted-foreground-light: 160 14% 93% / 0.5; /* rgba(231, 236, 235, 0.5) */
+  --muted-foreground-dark: 160 14% 93% / 0.6; /* rgba(231, 236, 235, 0.6) */
+  --card: 220 17% 98% / 0.01;
+  --card-foreground: 160 14% 93%;
+  --popover: 210 11% 7%;
+  --popover-foreground: 160 14% 93%;
+  --primary: 165 96% 71%; /* #78fcd6 */
+  --primary-foreground: 160 8% 6%; /* #0d0f0e */
+  --primary-dark: 160 100% 50%; /* #00ffb6 */
+  --primary-light: 160 48% 87%;
+  --secondary: 160 14% 93%; /* #e7eceb */
+  --secondary-foreground: 165 14% 8%; /* #141a18 */
+  --accent: 240 2% 25%; /* #3f3f42 */
+  --accent-foreground: 240 2% 96%; /* #f4f4f5 */
+  --border: 240 100% 100% / 0.08; /* rgba(255, 255, 255, 0.08) */
+  --border-light: 210 17% 6% / 0.1; /* rgba(16,24,40,0.1) */
+  --border-dark: 210 17% 6% / 0.05; /* rgba(16,24,40,0.05) */
+  --ring: 165 96% 71%;
+  --input: hsl(var(--muted));
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+  --radius: 0.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: 210 11% 7%;
+  --foreground: 160 14% 93%;
+  --muted: 240 2% 16%;
+  --muted-foreground: 160 14% 93% / 0.7;
+  --card: 220 17% 98% / 0.01;
+  --card-foreground: 160 14% 93%;
+  --popover: 210 11% 7%;
+  --popover-foreground: 160 14% 93%;
+  --primary: 165 96% 71%;
+  --primary-foreground: 160 8% 6%;
+  --primary-dark: 160 100% 50%;
+  --primary-light: 160 48% 87%;
+  --secondary: 160 14% 93%;
+  --secondary-foreground: 165 14% 8%;
+  --accent: 240 2% 25%;
+  --accent-foreground: 240 2% 96%;
+  --border: 240 100% 100% / 0.08;
+  --border-light: 210 17% 6% / 0.1;
+  --border-dark: 210 17% 6% / 0.05;
+  --ring: 165 96% 71%;
+  --input: hsl(var(--muted));
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
+}
+
+/* Define Tailwind v4 theme with semantic design tokens */
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-dark: hsl(var(--primary-dark));
+  --color-primary-light: hsl(var(--primary-light));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius: var(--radius);
+}
+
+* {
+  @apply border-border;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  @apply bg-background text-foreground;
 }
