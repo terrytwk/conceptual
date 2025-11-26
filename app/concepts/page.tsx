@@ -6,13 +6,19 @@ import { FooterSection } from '@/components/footer-section'
 import { ConceptsSidebar } from '@/components/concepts/sidebar'
 import { ConceptsGrid } from '@/components/concepts/grid'
 import { ConceptsPromo } from '@/components/concepts/promo'
-import { Search, ChevronDown } from 'lucide-react'
+import { AddConceptDialog } from '@/components/concepts/add-concept-dialog'
+import { Search, ChevronDown, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function ConceptsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('all')
     const [sortBy, setSortBy] = useState('trending')
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const { isAuthenticated } = useAuth()
 
     return (
         <div className="min-h-screen bg-background">
@@ -25,6 +31,15 @@ export default function ConceptsPage() {
                             <h1 className="text-3xl font-bold text-foreground mb-2">Concepts</h1>
                             <p className="text-muted-foreground">Explore backend components ready to use</p>
                         </div>
+                        {isAuthenticated && (
+                            <Button
+                                onClick={() => setIsAddDialogOpen(true)}
+                                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Add Concept
+                            </Button>
+                        )}
                     </div>
 
                     {/* Search and Filters */}
@@ -63,7 +78,11 @@ export default function ConceptsPage() {
 
                     {/* Grid Content */}
                     <div className="lg:col-span-2">
-                        <ConceptsGrid searchQuery={searchQuery} selectedCategory={selectedCategory} />
+                        <ConceptsGrid
+                            searchQuery={searchQuery}
+                            selectedCategory={selectedCategory}
+                            refreshKey={refreshKey}
+                        />
                     </div>
 
                     {/* Promo Sidebar */}
@@ -75,6 +94,15 @@ export default function ConceptsPage() {
             <div className="mt-16">
                 <FooterSection />
             </div>
+
+            <AddConceptDialog
+                open={isAddDialogOpen}
+                onOpenChange={setIsAddDialogOpen}
+                onSuccess={() => {
+                    // Refresh the concepts list
+                    setRefreshKey(prev => prev + 1)
+                }}
+            />
         </div>
     )
 }

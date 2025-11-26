@@ -1,127 +1,219 @@
 'use client'
 
-import { Box, ThumbsUp, Download, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Box, ThumbsUp, Download, Zap, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { getAllConcepts, type ConceptItem } from '@/lib/concepts'
 
 interface ConceptsGridProps {
     searchQuery: string
     selectedCategory: string
+    refreshKey?: number
 }
 
-const concepts = [
-    {
-        id: 1,
-        title: 'User',
-        description: 'Associate identifying information with users. Handles registration and user data updates.',
-        category: 'user-management',
-        tags: ['authentication', 'identity'],
-        likes: 1240,
-        views: 45600,
-        updated: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        featured: true,
-    },
-    {
-        id: 2,
-        title: 'Post',
-        description: 'User-facing unit for creating and managing content in social media applications',
-        category: 'social',
-        tags: ['content', 'social'],
-        likes: 892,
-        views: 32100,
-        updated: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-        featured: true,
-    },
-    {
-        id: 3,
-        title: 'Comment',
-        description: 'Allows users to associate comments with any target object. Fully polymorphic and independent.',
-        category: 'social',
-        tags: ['interaction', 'social'],
-        likes: 567,
-        views: 18900,
-        updated: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 4,
-        title: 'Upvote',
-        description: 'Express positive feedback on posts, comments, or any target content',
-        category: 'interaction',
-        tags: ['engagement', 'social'],
-        likes: 723,
-        views: 25400,
-        updated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 5,
-        title: 'Friend',
-        description: 'Manage social connections and follow relationships between users',
-        category: 'social',
-        tags: ['relationships', 'social'],
-        likes: 645,
-        views: 21700,
-        updated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 6,
-        title: 'Profile',
-        description: 'Associate descriptive information with users, including bio and profile images',
-        category: 'user-management',
-        tags: ['identity', 'profile'],
-        likes: 891,
-        views: 33200,
-        updated: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 7,
-        title: 'Article',
-        description: 'Publish and manage articles with title, description, body, and metadata',
-        category: 'content',
-        tags: ['content', 'publishing'],
-        likes: 754,
-        views: 28900,
-        updated: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 8,
-        title: 'Tag',
-        description: 'Categorize and organize content with flexible tagging system',
-        category: 'content',
-        tags: ['organization', 'metadata'],
-        likes: 623,
-        views: 20100,
-        updated: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 9,
-        title: 'Favorite',
-        description: 'Bookmark and track favorite content with count tracking',
-        category: 'interaction',
-        tags: ['bookmarking', 'engagement'],
-        likes: 589,
-        views: 19200,
-        updated: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-    {
-        id: 10,
-        title: 'Password',
-        description: 'Secure authentication and password management for user accounts',
-        category: 'user-management',
-        tags: ['security', 'authentication'],
-        likes: 856,
-        views: 27800,
-        updated: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        featured: false,
-    },
-]
+interface Concept {
+    id: string
+    title: string
+    description: string
+    category: string
+    tags: string[]
+    likes: number
+    views: number
+    updated: Date
+    featured: boolean
+    owner?: string
+    latestVersion?: string
+    versionCount?: number
+}
 
-export function ConceptsGrid({ searchQuery, selectedCategory }: ConceptsGridProps) {
+// Dummy concepts data - commented out but kept for reference
+// const dummyConcepts = [
+//     {
+//         id: 1,
+//         title: 'User',
+//         description: 'Associate identifying information with users. Handles registration and user data updates.',
+//         category: 'user-management',
+//         tags: ['authentication', 'identity'],
+//         likes: 1240,
+//         views: 45600,
+//         updated: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+//         featured: true,
+//     },
+//     {
+//         id: 2,
+//         title: 'Post',
+//         description: 'User-facing unit for creating and managing content in social media applications',
+//         category: 'social',
+//         tags: ['content', 'social'],
+//         likes: 892,
+//         views: 32100,
+//         updated: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+//         featured: true,
+//     },
+//     {
+//         id: 3,
+//         title: 'Comment',
+//         description: 'Allows users to associate comments with any target object. Fully polymorphic and independent.',
+//         category: 'social',
+//         tags: ['interaction', 'social'],
+//         likes: 567,
+//         views: 18900,
+//         updated: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 4,
+//         title: 'Upvote',
+//         description: 'Express positive feedback on posts, comments, or any target content',
+//         category: 'interaction',
+//         tags: ['engagement', 'social'],
+//         likes: 723,
+//         views: 25400,
+//         updated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 5,
+//         title: 'Friend',
+//         description: 'Manage social connections and follow relationships between users',
+//         category: 'social',
+//         tags: ['relationships', 'social'],
+//         likes: 645,
+//         views: 21700,
+//         updated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 6,
+//         title: 'Profile',
+//         description: 'Associate descriptive information with users, including bio and profile images',
+//         category: 'user-management',
+//         tags: ['identity', 'profile'],
+//         likes: 891,
+//         views: 33200,
+//         updated: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 7,
+//         title: 'Article',
+//         description: 'Publish and manage articles with title, description, body, and metadata',
+//         category: 'content',
+//         tags: ['content', 'publishing'],
+//         likes: 754,
+//         views: 28900,
+//         updated: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 8,
+//         title: 'Tag',
+//         description: 'Categorize and organize content with flexible tagging system',
+//         category: 'content',
+//         tags: ['organization', 'metadata'],
+//         likes: 623,
+//         views: 20100,
+//         updated: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 9,
+//         title: 'Favorite',
+//         description: 'Bookmark and track favorite content with count tracking',
+//         category: 'interaction',
+//         tags: ['bookmarking', 'engagement'],
+//         likes: 589,
+//         views: 19200,
+//         updated: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+//     {
+//         id: 10,
+//         title: 'Password',
+//         description: 'Secure authentication and password management for user accounts',
+//         category: 'user-management',
+//         tags: ['security', 'authentication'],
+//         likes: 856,
+//         views: 27800,
+//         updated: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+//         featured: false,
+//     },
+// ]
+
+// Helper function to generate dummy data for fields that don't exist in API yet
+function generateDummyData(conceptId: string, title: string): Omit<Concept, 'id' | 'title' | 'owner' | 'latestVersion' | 'versionCount'> {
+    // Generate consistent dummy data based on concept ID
+    const categories = ['user-management', 'social', 'content', 'interaction']
+    const allTags = ['authentication', 'identity', 'content', 'social', 'interaction', 'engagement', 'relationships', 'profile', 'publishing', 'organization', 'metadata', 'bookmarking', 'security']
+
+    // Use concept ID to generate consistent dummy values
+    const hash = conceptId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+
+    return {
+        description: `A reusable backend concept for ${title.toLowerCase()} functionality.`,
+        category: categories[hash % categories.length],
+        tags: allTags.slice(hash % allTags.length, (hash % allTags.length) + 2),
+        likes: (hash % 1000) + 100,
+        views: ((hash % 50) + 10) * 1000,
+        updated: new Date(Date.now() - (hash % 30) * 24 * 60 * 60 * 1000),
+        featured: hash % 3 === 0,
+    }
+}
+
+// Convert API concept item to display concept
+function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
+    // Get the latest published version
+    const publishedVersions = apiConcept.versions.filter(v => v.status === 'PUBLISHED')
+    const latestVersion = publishedVersions.length > 0
+        ? publishedVersions.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())[0]
+        : null
+
+    // Get the most recent published date, or use current date if no versions
+    const updatedDate = latestVersion
+        ? new Date(latestVersion.publishedAt)
+        : new Date()
+
+    // Generate dummy data for fields not in API
+    const dummyData = generateDummyData(apiConcept.concept, apiConcept.uniqueName)
+
+    return {
+        id: apiConcept.concept,
+        title: apiConcept.uniqueName,
+        owner: apiConcept.owner,
+        latestVersion: latestVersion?.semver,
+        versionCount: apiConcept.versions.length,
+        ...dummyData,
+        updated: updatedDate, // Override dummy updated with real published date
+    }
+}
+
+export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: ConceptsGridProps) {
+    const [concepts, setConcepts] = useState<Concept[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        async function fetchConcepts() {
+            setIsLoading(true)
+            setError(null)
+            try {
+                const apiConcepts = await getAllConcepts()
+
+                // Convert API concepts to display format
+                const displayConcepts = apiConcepts.map(convertApiConceptToDisplay)
+
+                setConcepts(displayConcepts)
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to load concepts')
+                console.error('Error fetching concepts:', err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        fetchConcepts()
+    }, [refreshKey])
+
     const filteredConcepts = concepts.filter((concept) => {
         const matchesSearch = concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             concept.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -129,68 +221,105 @@ export function ConceptsGrid({ searchQuery, selectedCategory }: ConceptsGridProp
         return matchesSearch && matchesCategory
     })
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Loading concepts...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                    <p className="text-sm text-destructive mb-2">{error}</p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="text-sm text-primary hover:underline"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-4">
             <div className="text-sm text-muted-foreground mb-4">
-                {filteredConcepts.length} concepts found
+                {filteredConcepts.length} {filteredConcepts.length === 1 ? 'concept' : 'concepts'} found
             </div>
 
-            <div className="space-y-3">
-                {filteredConcepts.map((concept) => (
-                    <a
-                        key={concept.id}
-                        href={`#concept-${concept.id}`}
-                        className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
-                    >
-                        <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-start gap-3 flex-1">
-                                <div className="mt-1">
-                                    <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            {filteredConcepts.length === 0 ? (
+                <div className="text-center py-12">
+                    <p className="text-muted-foreground">
+                        {searchQuery || selectedCategory !== 'all'
+                            ? 'No concepts match your filters.'
+                            : 'No concepts registered yet. Be the first to add one!'}
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    {filteredConcepts.map((concept) => (
+                        <a
+                            key={concept.id}
+                            href={`#concept-${concept.id}`}
+                            className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
+                        >
+                            <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-start gap-3 flex-1">
+                                    <div className="mt-1">
+                                        <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                            {concept.title}
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            {concept.description}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                                        {concept.title}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {concept.description}
-                                    </p>
+                                {concept.featured && (
+                                    <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium ml-2 shrink-0">
+                                        <Zap className="w-3 h-3" />
+                                        Featured
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 mt-3 mb-3">
+                                {concept.tags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
+                                <div className="flex gap-4">
+                                    <div className="flex items-center gap-1">
+                                        <Download className="w-3 h-3" />
+                                        <span>{(concept.views / 1000).toFixed(0)}k</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <ThumbsUp className="w-3 h-3" />
+                                        <span>{concept.likes}</span>
+                                    </div>
                                 </div>
                             </div>
-                            {concept.featured && (
-                                <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium ml-2 shrink-0">
-                                    <Zap className="w-3 h-3" />
-                                    Featured
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 mt-3 mb-3">
-                            {concept.tags.map((tag) => (
-                                <span
-                                    key={tag}
-                                    className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
-                                >
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
-                            <div className="flex gap-4">
-                                <div className="flex items-center gap-1">
-                                    <Download className="w-3 h-3" />
-                                    <span>{(concept.views / 1000).toFixed(0)}k</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <ThumbsUp className="w-3 h-3" />
-                                    <span>{concept.likes}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                ))}
-            </div>
+                        </a>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }
