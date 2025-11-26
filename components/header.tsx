@@ -4,12 +4,14 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Search } from 'lucide-react'
+import { Menu, Search, LogOut, User } from 'lucide-react'
 import Link from "next/link"
 import { useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState("")
+  const { isAuthenticated, userId, logout, isLoading } = useAuth()
   const navItems = [
     { name: "Concepts", href: "/concepts" },
     { name: "Features", href: "/features" },
@@ -54,11 +56,32 @@ export function Header() {
               />
             </div>
           </form>
-          <Link href="https://vercel.com/home" target="_blank" rel="noopener noreferrer" className="hidden md:block">
-            <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-6 py-2 rounded-full font-medium shadow-sm">
-              Try for Free
-            </Button>
-          </Link>
+          {!isLoading && (
+            <div className="hidden md:flex items-center gap-3">
+              {isAuthenticated ? (
+                <Link href="/profile">
+                  <button className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 border-2 border-primary/30 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background">
+                    <span className="text-sm font-semibold text-primary">
+                      {userId ? userId.charAt(0).toUpperCase() : "?"}
+                    </span>
+                  </button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <Button variant="ghost" className="text-foreground hover:text-foreground px-4 py-2 rounded-full font-medium">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/signup">
+                    <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-6 py-2 rounded-full font-medium shadow-sm">
+                      Sign up
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
           <Sheet>
             <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon" className="text-foreground">
@@ -80,11 +103,40 @@ export function Header() {
                     {item.name}
                   </Link>
                 ))}
-                <Link href="https://vercel.com/home" target="_blank" rel="noopener noreferrer" className="w-full mt-4">
-                  <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/90 px-6 py-2 rounded-full font-medium shadow-sm">
-                    Try for Free
-                  </Button>
-                </Link>
+                {!isLoading && (
+                  <div className="flex flex-col gap-3 mt-4">
+                    {isAuthenticated ? (
+                      <Link href="/profile" className="w-full">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
+                            <span className="text-sm font-semibold text-primary">
+                              {userId ? userId.charAt(0).toUpperCase() : "?"}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-foreground truncate">
+                              {userId || "User"}
+                            </div>
+                            <div className="text-xs text-muted-foreground">View Profile</div>
+                          </div>
+                        </div>
+                      </Link>
+                    ) : (
+                      <>
+                        <Link href="/login" className="w-full">
+                          <Button variant="ghost" className="w-full text-foreground hover:text-foreground px-4 py-2 rounded-full font-medium">
+                            Login
+                          </Button>
+                        </Link>
+                        <Link href="/signup" className="w-full">
+                          <Button className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 px-6 py-2 rounded-full font-medium shadow-sm">
+                            Sign up
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
