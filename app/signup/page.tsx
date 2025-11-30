@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function SignUpPage() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
@@ -44,9 +44,9 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      const userId = await register(username, password)
-      // Update auth context (which handles localStorage)
-      setAuthUser(userId)
+      const { user, accessToken, refreshToken } = await register(email, password)
+      // Update auth context (which handles localStorage and tokens)
+      setAuthUser(user, accessToken, refreshToken)
       // Redirect to home page or dashboard
       router.push("/")
     } catch (err) {
@@ -73,15 +73,15 @@ export default function SignUpPage() {
               )}
 
               <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium text-foreground">
-                  Username
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
+                  Email
                 </label>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="Choose a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   className="w-full"
                   disabled={isLoading}
