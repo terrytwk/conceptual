@@ -6,17 +6,60 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, Search, LogOut, User } from 'lucide-react'
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { getProfile } from "@/lib/profile"
+
+// Get user initials (first and last name) for avatar
+const getInitials = (name: string) => {
+  if (!name) return "?"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase()
+  }
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState("")
   const { isAuthenticated, userId, logout, isLoading } = useAuth()
+  const [profileData, setProfileData] = useState<{
+    displayName: string
+    username: string
+    avatarUrl: string
+  } | null>(null)
+  
   const navItems = [
     { name: "Concepts", href: "/concepts" },
     { name: "Features", href: "/features" },
     { name: "Docs", href: "/docs" },
   ]
+
+  // Fetch user profile when authenticated
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!userId || !isAuthenticated) {
+        setProfileData(null)
+        return
+      }
+
+      try {
+        const profile = await getProfile(userId)
+        setProfileData({
+          displayName: profile.displayName || "",
+          username: profile.username || "",
+          avatarUrl: profile.avatarUrl || "",
+        })
+      } catch (error) {
+        console.error("Failed to fetch profile in header:", error)
+        // Keep null on error - will show initials with "?"
+      }
+    }
+
+    if (isAuthenticated && userId) {
+      fetchProfile()
+    }
+  }, [userId, isAuthenticated])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,10 +103,28 @@ export function Header() {
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated ? (
                 <Link href="/profile">
-                  <button className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 border-2 border-primary/30 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background">
-                    <span className="text-sm font-semibold text-primary">
-                      {userId ? userId.charAt(0).toUpperCase() : "?"}
-                    </span>
+                  <button className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 border-2 border-primary/30 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background overflow-hidden">
+                    {profileData?.avatarUrl ? (
+                      <img
+                        src={profileData.avatarUrl}
+                        alt={profileData.displayName || profileData.username || "Profile"}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement
+                          target.style.display = "none"
+                          const parent = target.parentElement
+                          if (parent) {
+                            const displayName = profileData?.displayName || profileData?.username || ""
+                            parent.innerHTML = `<span class="text-sm font-semibold text-primary flex items-center justify-center w-full h-full bg-primary/20">${getInitials(displayName)}</span>`
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-primary">
+                        {getInitials(profileData?.displayName || profileData?.username || "")}
+                      </span>
+                    )}
                   </button>
                 </Link>
               ) : (
@@ -108,14 +169,32 @@ export function Header() {
                     {isAuthenticated ? (
                       <Link href="/profile" className="w-full">
                         <div className="flex items-center gap-3 px-4 py-3 bg-muted rounded-lg border border-border hover:bg-accent transition-colors">
-                          <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center">
-                            <span className="text-sm font-semibold text-primary">
-                              {userId ? userId.charAt(0).toUpperCase() : "?"}
-                            </span>
+                          <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center overflow-hidden">
+                            {profileData?.avatarUrl ? (
+                              <img
+                                src={profileData.avatarUrl}
+                                alt={profileData.displayName || profileData.username || "Profile"}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to initials if image fails to load
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = "none"
+                                  const parent = target.parentElement
+                                  if (parent) {
+                                    const displayName = profileData?.displayName || profileData?.username || ""
+                                    parent.innerHTML = `<span class="text-sm font-semibold text-primary flex items-center justify-center w-full h-full bg-primary/20">${getInitials(displayName)}</span>`
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <span className="text-sm font-semibold text-primary">
+                                {getInitials(profileData?.displayName || profileData?.username || "")}
+                              </span>
+                            )}
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-medium text-foreground truncate">
-                              {userId || "User"}
+                              {profileData?.displayName || profileData?.username || "User"}
                             </div>
                             <div className="text-xs text-muted-foreground">View Profile</div>
                           </div>

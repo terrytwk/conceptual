@@ -180,12 +180,37 @@ export async function registerConcept(
 }
 
 /**
- * Get all concepts from the registry with their associated versions
+ * Response type for /api/registry/all endpoint
+ */
+export interface RegistryConcept {
+    concept: string;
+    unique_name: string;
+    author: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface RegistryAllResponse {
+    results: RegistryConcept[];
+}
+
+/**
+ * Get all concepts from the registry
+ * Uses the /api/registry/all endpoint which returns basic concept information
  */
 export async function getAllConcepts(): Promise<ConceptItem[]> {
     try {
-        const response = await api.post<ConceptItem[]>('/ConceptRegistering/_getAll', {});
-        return response.data;
+        const response = await api.post<RegistryAllResponse>('/registry/all', {});
+        
+        // Map the registry response to ConceptItem format
+        // Note: versions are not included in the registry/all response
+        // If versions are needed, they would need to be fetched separately
+        return response.data.results.map((regConcept): ConceptItem => ({
+            concept: regConcept.concept,
+            uniqueName: regConcept.unique_name,
+            owner: regConcept.author,
+            versions: [], // Versions not included in registry/all response
+        }));
     } catch (error) {
         if (error instanceof AxiosError && error.response?.data) {
             const apiError = error.response.data as ApiError;

@@ -215,90 +215,24 @@ Query: Returns recent downloads for a user.
 
 ### UserProfileDisplaying
 
-Manages user profile information (display name, avatar, bio).
+Manages user profile information (username, display name, avatar, bio).
 
-#### `POST /api/UserProfileDisplaying/setDisplayName`
+#### `POST /api/UserProfileDisplaying/setProfile`
 
-Sets or updates a user's display name.
-
-**Request Body:**
-```json
-{
-  "user": "user123",
-  "name": "John Doe"
-}
-```
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
-**Error Responses:**
-- `{ "error": "User ID is required" }` (400)
-
----
-
-#### `POST /api/UserProfileDisplaying/setAvatar`
-
-Sets or updates a user's avatar URL.
+Sets or updates profile fields for a user. Only provided fields are updated; others remain unchanged.
 
 **Request Body:**
 ```json
 {
   "user": "user123",
-  "url": "https://example.com/avatar.jpg"
-}
-```
-
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
-**Error Responses:**
-- `{ "error": "User ID is required" }` (400)
-
----
-
-#### `POST /api/UserProfileDisplaying/setBio`
-
-Sets or updates a user's bio.
-
-**Request Body:**
-```json
-{
-  "user": "user123",
+  "username": "johndoe",
+  "displayName": "John Doe",
+  "avatarUrl": "https://example.com/avatar.jpg",
   "bio": "Software developer and concept enthusiast"
 }
 ```
 
-**Response:**
-```json
-{
-  "ok": true
-}
-```
-
-**Error Responses:**
-- `{ "error": "User ID is required" }` (400)
-
----
-
-#### `POST /api/UserProfileDisplaying/clearProfile`
-
-Clears all profile fields for a user.
-
-**Request Body:**
-```json
-{
-  "user": "user123"
-}
-```
+**Note:** All fields (`username`, `displayName`, `avatarUrl`, `bio`) are optional. You can provide any combination of these fields to update only the desired fields.
 
 **Response:**
 ```json
@@ -327,6 +261,7 @@ Query: Retrieves profile information for a user.
 ```json
 [
   {
+    "username": "johndoe",
     "displayName": "John Doe",
     "avatarUrl": "https://example.com/avatar.jpg",
     "bio": "Software developer and concept enthusiast"
@@ -335,6 +270,32 @@ Query: Retrieves profile information for a user.
 ```
 
 **Note:** If no profile exists, returns empty strings for all fields.
+
+---
+
+#### `POST /api/UserProfileDisplaying/_userByUsername`
+
+Query: Retrieves a user ID by username.
+
+**Request Body:**
+```json
+{
+  "username": "johndoe"
+}
+```
+
+**Response:**
+```json
+[
+  {
+    "user": "user123"
+  }
+]
+```
+
+**Error Responses:**
+- `{ "error": "Username is required" }` (400) - when username is empty or missing
+- `{ "error": "Username not found" }` (404) - when no user has the given username
 
 ---
 
@@ -406,6 +367,63 @@ curl -X POST http://localhost:8000/api/registry/publish \
       "README.md": "..."
     }
   }'
+```
+
+---
+
+#### `POST /api/registry/all`
+
+Retrieves all registered concepts from the registry. This endpoint returns a list of all concepts with their details including unique name, author, and timestamps.
+
+**Headers:**
+- `Content-Type: application/json` (optional)
+
+**Request Body:**
+```json
+{}
+```
+
+**Note:**
+- No authentication required
+- No request body parameters needed (empty object or no body)
+- Returns all concepts registered in the system
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "concept": "concept123",
+      "unique_name": "MyNewConcept",
+      "author": "user456",
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    },
+    {
+      "concept": "concept789",
+      "unique_name": "AnotherConcept",
+      "author": "user123",
+      "created_at": "2024-01-14T08:20:00.000Z",
+      "updated_at": "2024-01-14T08:20:00.000Z"
+    }
+  ]
+}
+```
+
+**Note:**
+- If no concepts are registered, returns an empty array: `{ "results": [] }`
+- Each concept in the results includes:
+  - `concept` (string): The unique concept ID
+  - `unique_name` (string): The unique name of the concept
+  - `author` (string): The user ID of the concept author
+  - `created_at` (string): ISO 8601 timestamp of when the concept was created
+  - `updated_at` (string): ISO 8601 timestamp of when the concept was last updated
+
+**Example using curl:**
+```bash
+curl -X POST http://localhost:8000/api/registry/all \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 ---

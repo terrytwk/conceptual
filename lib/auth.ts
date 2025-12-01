@@ -19,6 +19,9 @@ export interface LoginResponse {
 export interface RegisterRequest {
     email: string;
     password: string;
+    name?: string;
+    username?: string;
+    bio?: string;
 }
 
 export interface RegisterResponse {
@@ -75,15 +78,31 @@ export async function login(email: string, password: string): Promise<LoginRespo
  * Register a new user
  * @param email - User email
  * @param password - User password
+ * @param name - User's full name (optional)
+ * @param username - User's username (optional)
+ * @param bio - User's bio (optional)
  * @returns Auth response with user ID and tokens
  * @throws Error with message if registration fails
  */
-export async function register(email: string, password: string): Promise<RegisterResponse> {
+export async function register(
+    email: string, 
+    password: string, 
+    name?: string, 
+    username?: string, 
+    bio?: string
+): Promise<RegisterResponse> {
     try {
-        const response = await api.post<RegisterResponse>('/auth/register', {
+        const requestBody: RegisterRequest = {
             email,
             password,
-        });
+        };
+        
+        // Only include optional fields if they are provided
+        if (name) requestBody.name = name;
+        if (username) requestBody.username = username;
+        if (bio) requestBody.bio = bio;
+        
+        const response = await api.post<RegisterResponse>('/auth/register', requestBody);
         return response.data;
     } catch (error) {
         if (error instanceof AxiosError && error.response?.data) {

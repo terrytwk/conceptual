@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function SignUpPage() {
+  const [name, setName] = useState("")
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -30,6 +32,17 @@ export default function SignUpPage() {
     e.preventDefault()
     setError("")
 
+    // Validate required fields
+    if (!name.trim()) {
+      setError("Name is required")
+      return
+    }
+
+    if (!username.trim()) {
+      setError("Username is required")
+      return
+    }
+
     // Validate password confirmation
     if (password !== confirmPassword) {
       setError("Passwords do not match")
@@ -44,7 +57,7 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      const { user, accessToken, refreshToken } = await register(email, password)
+      const { user, accessToken, refreshToken } = await register(email, password, name, username)
       // Update auth context (which handles localStorage and tokens)
       setAuthUser(user, accessToken, refreshToken)
       // Redirect to home page or dashboard
@@ -72,6 +85,38 @@ export default function SignUpPage() {
                 </div>
               )}
 
+              <div className="space-y-2">
+                <label htmlFor="name" className="text-sm font-medium text-foreground">
+                  Name <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full"
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="username" className="text-sm font-medium text-foreground">
+                  Username <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full"
+                  disabled={isLoading}
+                />
+              </div>
+              
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email
