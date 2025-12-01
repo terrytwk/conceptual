@@ -5,15 +5,6 @@ import { AxiosError } from 'axios';
  * Concept Registration API functions
  */
 
-export interface ReserveNameRequest {
-    uniqueName: string;
-    owner: string;
-}
-
-export interface ReserveNameResponse {
-    concept: string;
-}
-
 export interface PublishVersionRequest {
     concept: string;
     semver: string;
@@ -66,25 +57,6 @@ export interface ConceptLatestVersion {
 }
 
 /**
- * Reserve a unique name for a concept
- */
-export async function reserveConceptName(uniqueName: string, owner: string): Promise<string> {
-    try {
-        const response = await api.post<ReserveNameResponse>('/ConceptRegistering/reserveName', {
-            uniqueName,
-            owner,
-        });
-        return response.data.concept;
-    } catch (error) {
-        if (error instanceof AxiosError && error.response?.data) {
-            const apiError = error.response.data as ApiError;
-            throw new Error(apiError.error || 'Failed to reserve concept name');
-        }
-        throw new Error('Failed to reserve concept name. Please try again.');
-    }
-}
-
-/**
  * Publish a version of a concept
  */
 export async function publishConceptVersion(
@@ -105,6 +77,81 @@ export async function publishConceptVersion(
             throw new Error(apiError.error || 'Failed to publish concept version');
         }
         throw new Error('Failed to publish concept version. Please try again.');
+    }
+}
+
+/**
+ * Parse semver string to version number (non-negative integer)
+ * Extracts the major version number from semver (e.g., "1.0.0" -> 1, "2.1.3" -> 2)
+ */
+export function parseVersionNumber(semver: string): number {
+    const parts = semver.trim().split('.');
+    const major = parseInt(parts[0], 10);
+    if (isNaN(major) || major < 0) {
+        throw new Error(`Invalid version number. Expected non-negative integer, got: ${semver}`);
+    }
+    return major;
+}
+
+/**
+ * Convert a File to Uint8Array
+ */
+async function fileToUint8Array(file: File): Promise<Uint8Array> {
+    const arrayBuffer = await file.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+}
+
+/**
+ * Publish a concept with folder upload using JSON format
+ * This uses the /api/registry/publish endpoint which automatically creates concepts
+ * and handles versioning (creates version 1 automatically)
+ */
+export interface PublishConceptWithFolderResponse {
+    concept: string;
+    version: string;
+    unique_name: string;
+    ok: boolean;
+}
+
+export async function publishConceptWithFolder(
+    uniqueName: string,
+    files: FileList | File[]
+): Promise<string> {
+    try {
+        // Convert files to Uint8Array and create files map
+        const fileArray = Array.from(files);
+        const filesMap: Record<string, number[]> = {};
+
+        // Process each file and convert to Uint8Array
+        for (const file of fileArray) {
+            // Get file path - use webkitRelativePath if available (from folder selection)
+            // Otherwise use just the filename
+            const filePath = (file as any).webkitRelativePath || file.name;
+            
+            // Convert file to Uint8Array
+            const uint8Array = await fileToUint8Array(file);
+            
+            // Convert Uint8Array to regular array for JSON serialization
+            filesMap[filePath] = Array.from(uint8Array);
+        }
+
+        // Prepare request body according to API spec
+        const requestBody = {
+            unique_name: uniqueName,
+            files: filesMap,
+        };
+
+        const response = await api.post<PublishConceptWithFolderResponse>(
+            '/registry/publish',
+            requestBody
+        );
+        return response.data.version;
+    } catch (error) {
+        if (error instanceof AxiosError && error.response?.data) {
+            const apiError = error.response.data as ApiError;
+            throw new Error(apiError.error || 'Failed to publish concept');
+        }
+        throw new Error('Failed to publish concept. Please try again.');
     }
 }
 

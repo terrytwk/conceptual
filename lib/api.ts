@@ -56,6 +56,12 @@ const createApiClient = (): AxiosInstance => {
   // Request interceptor - inject access token
   apiClient.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
+      // If FormData is being sent, let axios automatically set Content-Type with boundary
+      // Don't override with application/json
+      if (config.data instanceof FormData) {
+        delete config.headers['Content-Type'];
+      }
+
       // Skip token injection for auth endpoints that don't require it
       // /auth/register, /auth/login, and /auth/refresh don't need tokens
       // /auth/logout and /auth/_getUser DO need tokens (but they're set explicitly in auth.ts)

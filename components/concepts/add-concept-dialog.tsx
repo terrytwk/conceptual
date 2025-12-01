@@ -11,9 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { reserveConceptName, publishConceptVersion } from "@/lib/concepts"
+import { publishConceptWithFolder } from "@/lib/concepts"
 import { useAuth } from "@/contexts/auth-context"
-import { Plus } from "lucide-react"
+import { FolderUpload } from "./folder-upload"
 
 interface AddConceptDialogProps {
   open: boolean
@@ -24,8 +24,7 @@ interface AddConceptDialogProps {
 export function AddConceptDialog({ open, onOpenChange, onSuccess }: AddConceptDialogProps) {
   const { userId } = useAuth()
   const [uniqueName, setUniqueName] = useState("")
-  const [semver, setSemver] = useState("1.0.0")
-  const [artifactUrl, setArtifactUrl] = useState("")
+  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null)
   const [description, setDescription] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -44,31 +43,23 @@ export function AddConceptDialog({ open, onOpenChange, onSuccess }: AddConceptDi
       return
     }
 
-    if (!semver.trim()) {
-      setError("Version is required")
-      return
-    }
-
-    if (!artifactUrl.trim()) {
-      setError("Artifact URL is required")
+    if (!selectedFiles || selectedFiles.length === 0) {
+      setError("Please select a folder to upload")
       return
     }
 
     setIsLoading(true)
 
     try {
-      // Step 1: Reserve the concept name
-      const conceptId = await reserveConceptName(uniqueName.trim(), userId)
-
-      // Step 2: Publish the version
-      await publishConceptVersion(conceptId, semver.trim(), artifactUrl.trim())
+      // Publish the concept with folder upload
+      // Version is automatically calculated by the backend
+      await publishConceptWithFolder(uniqueName.trim(), selectedFiles)
 
       // Reset form
       setUniqueName("")
-      setSemver("1.0.0")
-      setArtifactUrl("")
+      setSelectedFiles(null)
       setDescription("")
-      
+
       onOpenChange(false)
       if (onSuccess) {
         onSuccess()
@@ -84,8 +75,7 @@ export function AddConceptDialog({ open, onOpenChange, onSuccess }: AddConceptDi
     if (!newOpen) {
       // Reset form when closing
       setUniqueName("")
-      setSemver("1.0.0")
-      setArtifactUrl("")
+      setSelectedFiles(null)
       setDescription("")
       setError("")
     }
@@ -129,40 +119,15 @@ export function AddConceptDialog({ open, onOpenChange, onSuccess }: AddConceptDi
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="semver" className="text-sm font-medium text-foreground">
-              Version <span className="text-destructive">*</span>
+            <label className="text-sm font-medium text-foreground">
+              Concept Folder <span className="text-destructive">*</span>
             </label>
-            <Input
-              id="semver"
-              type="text"
-              placeholder="1.0.0"
-              value={semver}
-              onChange={(e) => setSemver(e.target.value)}
-              required
+            <FolderUpload
+              onFolderSelect={(files) => setSelectedFiles(files)}
               disabled={isLoading}
-              className="w-full"
             />
             <p className="text-xs text-muted-foreground">
-              Semantic version (e.g., 1.0.0, 2.1.3)
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="artifactUrl" className="text-sm font-medium text-foreground">
-              Artifact URL <span className="text-destructive">*</span>
-            </label>
-            <Input
-              id="artifactUrl"
-              type="url"
-              placeholder="https://example.com/concepts/myconcept-v1.0.0.ts"
-              value={artifactUrl}
-              onChange={(e) => setArtifactUrl(e.target.value)}
-              required
-              disabled={isLoading}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              URL to the concept artifact file
+              Upload the folder containing your concept files
             </p>
           </div>
 
