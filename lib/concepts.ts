@@ -128,10 +128,10 @@ export async function publishConceptWithFolder(
             // Get file path - use webkitRelativePath if available (from folder selection)
             // Otherwise use just the filename
             const filePath = (file as any).webkitRelativePath || file.name;
-            
+
             // Convert file to Uint8Array
             const uint8Array = await fileToUint8Array(file);
-            
+
             // Convert Uint8Array to regular array for JSON serialization
             filesMap[filePath] = Array.from(uint8Array);
         }
@@ -203,7 +203,7 @@ export interface RegistryAllResponse {
 export async function getAllConcepts(): Promise<ConceptItem[]> {
     try {
         const response = await api.post<RegistryAllResponse>('/registry/all', {});
-        
+
         // Map the registry response to ConceptItem format
         // Note: versions are not included in the registry/all response
         // If versions are needed, they would need to be fetched separately
@@ -220,6 +220,27 @@ export async function getAllConcepts(): Promise<ConceptItem[]> {
             throw new Error(apiError.error || 'Failed to fetch concepts');
         }
         throw new Error('Failed to fetch concepts. Please try again.');
+    }
+}
+
+/**
+ * Response for /registry/files endpoint
+ * Returns latest version's files as key->content (UTF-8 text)
+ */
+export interface RegistryFilesResponse {
+    files: Record<string, string>;
+}
+
+/**
+ * Fetch latest version source files for a concept by unique name.
+ * Uses /registry/files with body { unique_name }
+ */
+export async function getConceptFiles(uniqueName: string): Promise<Record<string, string>> {
+    try {
+        const response = await api.post<RegistryFilesResponse>("/registry/files", { unique_name: uniqueName });
+        return response.data.files || {};
+    } catch (error) {
+        return {};
     }
 }
 
@@ -265,4 +286,3 @@ export async function getConceptLatestVersion(concept: string): Promise<string |
         return null;
     }
 }
-

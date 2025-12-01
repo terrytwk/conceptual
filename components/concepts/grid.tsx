@@ -269,10 +269,13 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                 </div>
             ) : (
                 <div className="space-y-3">
-                    {filteredConcepts.map((concept) => (
+                    {filteredConcepts.map((concept) => {
+                        // concept.title formatted as author/uniqueName or uniqueName; extract uniqueName (after last '/')
+                        const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title;
+                        return (
                         <a
                             key={concept.id}
-                            href={`#concept-${concept.id}`}
+                            href={`/concepts/${uniqueName}`}
                             className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
                         >
                             <div className="flex items-start justify-between mb-2">
@@ -322,7 +325,7 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                                 </div>
                             </div>
                         </a>
-                    ))}
+                    )})}
                 </div>
             )}
         </div>
