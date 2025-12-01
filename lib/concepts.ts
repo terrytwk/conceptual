@@ -41,6 +41,7 @@ export interface ConceptItem {
     concept: string;
     uniqueName: string;
     owner: string;
+    authorUsername: string;
     versions: ConceptVersion[];
 }
 
@@ -186,6 +187,7 @@ export interface RegistryConcept {
     concept: string;
     unique_name: string;
     author: string;
+    author_username: string;
     created_at: string;
     updated_at: string;
 }
@@ -209,6 +211,7 @@ export async function getAllConcepts(): Promise<ConceptItem[]> {
             concept: regConcept.concept,
             uniqueName: regConcept.unique_name,
             owner: regConcept.author,
+            authorUsername: regConcept.author_username || '',
             versions: [], // Versions not included in registry/all response
         }));
     } catch (error) {

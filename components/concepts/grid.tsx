@@ -176,9 +176,14 @@ function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
     // Generate dummy data for fields not in API
     const dummyData = generateDummyData(apiConcept.concept, apiConcept.uniqueName)
 
+    // Format title as {author_username}/{unique_name}
+    const displayTitle = apiConcept.authorUsername
+        ? `${apiConcept.authorUsername}/${apiConcept.uniqueName}`
+        : apiConcept.uniqueName;
+
     return {
         id: apiConcept.concept,
-        title: apiConcept.uniqueName,
+        title: displayTitle,
         owner: apiConcept.owner,
         latestVersion: latestVersion?.semver,
         versionCount: apiConcept.versions.length,
