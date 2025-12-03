@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { FooterSection } from "@/components/footer-section";
 import { getConceptFiles } from "@/lib/concepts";
-import { Loader2, FileCode, ArrowLeft } from "lucide-react";
+import { Loader2, FileCode, ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import JSZip from "jszip";
 
 interface FileEntry {
   path: string;
@@ -47,6 +48,31 @@ export default function ConceptCodeViewerPage() {
 
   const selectedFile = files.find(f => f.path === selectedPath);
 
+  async function downloadZip() {
+    try {
+      if (files.length === 0) {
+        alert("No files in latest version to download.");
+        return;
+      }
+      const zip = new JSZip();
+      for (const f of files) {
+        zip.file(f.path, f.content);
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${uniqueName}-latest.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("Download failed. Please try again later.");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -83,6 +109,15 @@ export default function ConceptCodeViewerPage() {
           <div className="md:col-span-3 border border-border rounded-lg bg-card flex flex-col">
             <div className="px-4 py-3 flex items-center justify-between border-b border-border">
               <div className="text-sm font-medium text-muted-foreground">{selectedPath || "Select a file"}</div>
+              <button
+                type="button"
+                onClick={downloadZip}
+                className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted/60 transition-colors"
+                title="Download latest files as ZIP"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
             </div>
             <div className="flex-1 overflow-auto p-4">
               {loading && (

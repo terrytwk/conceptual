@@ -6,6 +6,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { getAllConcepts, type ConceptItem } from '@/lib/concepts'
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
 import { useAuth } from '@/contexts/auth-context'
+import JSZip from 'jszip'
+import { getConceptFiles } from '@/lib/concepts'
 
 interface ConceptsGridProps {
     searchQuery: string
@@ -26,6 +28,7 @@ interface Concept {
     owner?: string
     latestVersion?: string
     versionCount?: number
+    latestArtifactUrl?: string
 }
 
 // Dummy concepts data - commented out but kept for reference
@@ -166,9 +169,14 @@ function generateDummyData(conceptId: string, title: string): Omit<Concept, 'id'
 function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
     // Get the latest published version
     const publishedVersions = apiConcept.versions.filter(v => v.status === 'PUBLISHED')
-    const latestVersion = publishedVersions.length > 0
+    const latestPublished = publishedVersions.length > 0
         ? publishedVersions.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())[0]
         : null
+    // Fallback: use most recent version (any status) with an artifactUrl when no published versions exist
+    const mostRecentAny = apiConcept.versions.length > 0
+        ? [...apiConcept.versions].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())[0]
+        : null
+    const latestVersion = latestPublished ?? mostRecentAny
 
     // Get the most recent published date, or use current date if no versions
     const updatedDate = latestVersion
@@ -187,7 +195,8 @@ function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
         id: apiConcept.concept,
         title: displayTitle,
         owner: apiConcept.owner,
-        latestVersion: latestVersion?.semver,
+    latestVersion: latestVersion?.semver,
+    latestArtifactUrl: latestVersion?.artifactUrl,
         versionCount: apiConcept.versions.length,
         ...dummyData,
         updated: updatedDate, // Override dummy updated with real published date
@@ -242,6 +251,35 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
         const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true)
         return matchesSearch && matchesCategory
     })
+
+    const downloadConcept = async (concept: Concept) => {
+        try {
+            const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title
+            const files = await getConceptFiles(uniqueName)
+            const fileEntries = Object.entries(files)
+            if (fileEntries.length === 0) {
+                alert('No files found to download for this concept.')
+                return
+            }
+            const zip = new JSZip()
+            for (const [path, content] of fileEntries) {
+                zip.file(path, content)
+            }
+            const blob = await zip.generateAsync({ type: 'blob' })
+            const objectUrl = URL.createObjectURL(blob)
+            const filename = `${uniqueName}-${concept.latestVersion ?? 'latest'}.zip`
+            const a = document.createElement('a')
+            a.href = objectUrl
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(objectUrl)
+        } catch (e) {
+            console.error(e)
+            alert('Download failed. Please try again later.')
+        }
+    }
 
     const toggleLike = async (conceptId: string) => {
         if (!isAuthenticated || !userId) return
@@ -348,10 +386,15 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                                 <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
                                 <div className="flex gap-4">
-                                    <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => downloadConcept(concept)}
+                                        className="flex items-center gap-1 hover:text-primary"
+                                        title="Download concept"
+                                    >
                                         <Download className="w-3 h-3" />
-                                        <span>{(concept.views / 1000).toFixed(0)}k</span>
-                                    </div>
+                                        <span>Download</span>
+                                    </button>
                                     <button
                                         onClick={() => toggleLike(concept.id)}
                                         disabled={!isAuthenticated}
