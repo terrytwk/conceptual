@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Box, ThumbsUp, Download, Zap, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { getAllConcepts, type ConceptItem } from '@/lib/concepts'
+import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
+import { useAuth } from '@/contexts/auth-context'
 
 interface ConceptsGridProps {
     searchQuery: string
@@ -196,6 +198,9 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
     const [concepts, setConcepts] = useState<Concept[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [likesMap, setLikesMap] = useState<Record<string, number>>({})
+    const [likedMap, setLikedMap] = useState<Record<string, boolean>>({})
+    const { userId, isAuthenticated } = useAuth()
 
     useEffect(() => {
         async function fetchConcepts() {
@@ -203,9 +208,21 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
             setError(null)
             try {
                 const apiConcepts = await getAllConcepts()
-
-                // Convert API concepts to display format
                 const displayConcepts = apiConcepts.map(convertApiConceptToDisplay)
+
+                // Fetch like counts in parallel
+                const counts = await Promise.all(displayConcepts.map(c => countForItem(c.id)))
+                const lm: Record<string, number> = {}
+                displayConcepts.forEach((c, i) => { lm[c.id] = counts[i] })
+                setLikesMap(lm)
+
+                // Fetch liked state if authenticated
+                const likedState: Record<string, boolean> = {}
+                if (isAuthenticated && userId) {
+                    const likedFlags = await Promise.all(displayConcepts.map(c => isLiked(c.id, userId)))
+                    displayConcepts.forEach((c, i) => { likedState[c.id] = likedFlags[i] })
+                }
+                setLikedMap(likedState)
 
                 setConcepts(displayConcepts)
             } catch (err) {
@@ -217,14 +234,32 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
         }
 
         fetchConcepts()
-    }, [refreshKey])
+    }, [refreshKey, isAuthenticated, userId])
 
     const filteredConcepts = concepts.filter((concept) => {
         const matchesSearch = concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             concept.description.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory
+        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true)
         return matchesSearch && matchesCategory
     })
+
+    const toggleLike = async (conceptId: string) => {
+        if (!isAuthenticated || !userId) return
+        const liked = likedMap[conceptId] === true
+        if (liked) {
+            const res = await unlikeApi(conceptId, userId)
+            if (!res.error) {
+                setLikedMap(prev => ({ ...prev, [conceptId]: false }))
+                setLikesMap(prev => ({ ...prev, [conceptId]: Math.max(0, (prev[conceptId] ?? 0) - 1) }))
+            }
+        } else {
+            const res = await likeApi(conceptId, userId)
+            if (!res.error) {
+                setLikedMap(prev => ({ ...prev, [conceptId]: true }))
+                setLikesMap(prev => ({ ...prev, [conceptId]: (prev[conceptId] ?? 0) + 1 }))
+            }
+        }
+    }
 
     if (isLoading) {
         return (
@@ -268,14 +303,13 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                     </p>
                 </div>
             ) : (
-                <div className="space-y-3">
+        <div className="space-y-3">
                     {filteredConcepts.map((concept) => {
                         // concept.title formatted as author/uniqueName or uniqueName; extract uniqueName (after last '/')
                         const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title;
                         return (
-                        <a
+            <div
                             key={concept.id}
-                            href={`/concepts/${uniqueName}`}
                             className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
                         >
                             <div className="flex items-start justify-between mb-2">
@@ -284,9 +318,9 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                                         <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                                        <a href={`/concepts/${uniqueName}`} className="font-semibold text-foreground group-hover:text-primary transition-colors hover:underline">
                                             {concept.title}
-                                        </h3>
+                                        </a>
                                         <p className="text-sm text-muted-foreground mt-1">
                                             {concept.description}
                                         </p>
@@ -318,13 +352,17 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                                         <Download className="w-3 h-3" />
                                         <span>{(concept.views / 1000).toFixed(0)}k</span>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => toggleLike(concept.id)}
+                                        disabled={!isAuthenticated}
+                                        className={`flex items-center gap-1 ${likedMap[concept.id] ? 'text-primary' : ''}`}
+                                    >
                                         <ThumbsUp className="w-3 h-3" />
-                                        <span>{concept.likes}</span>
-                                    </div>
+                                        <span>{(likesMap[concept.id] ?? 0)}</span>
+                                    </button>
                                 </div>
                             </div>
-                        </a>
+                        </div>
                     )})}
                 </div>
             )}
