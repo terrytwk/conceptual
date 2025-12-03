@@ -235,13 +235,44 @@ export interface RegistryFilesResponse {
  * Fetch latest version source files for a concept by unique name.
  * Uses /registry/files with body { unique_name }
  */
-export async function getConceptFiles(uniqueName: string): Promise<Record<string, string>> {
+export async function getConceptFiles(uniqueName: string, version?: number): Promise<Record<string, string>> {
     try {
-        const response = await api.post<RegistryFilesResponse>("/registry/files", { unique_name: uniqueName });
+    const body: { unique_name: string; version?: number } = { unique_name: uniqueName };
+    if (typeof version === 'number') body.version = version;
+    const response = await api.post<RegistryFilesResponse>("/registry/files", body);
         return response.data.files || {};
     } catch (error) {
         return {};
     }
+}
+
+/**
+ * Download a specific version via backend sync (records analytics).
+ * Expects server to return { files: Record<string,string> } similar to registry/files.
+ */
+export async function downloadConceptVersion(uniqueName: string, version: number, accessToken?: string): Promise<Record<string, string>> {
+    try {
+    const response = await api.post<{ files: Record<string, string> }>("/concepts/download/version", { unique_name: uniqueName, version, accessToken });
+        return response.data.files || {};
+    } catch (error) {
+        return {};
+    }
+}
+
+/**
+ * Fetch concept-level download count using DownloadAnalyzing._countForItem.
+ * Resolves concept id by unique_name, then posts item + date range.
+ */
+export async function getConceptDownloadCountViaQuery(uniqueName: string): Promise<number> {
+    const conceptId = await getConceptIdByUniqueName(uniqueName);
+    if (!conceptId) return 0;
+    // Send ISO strings to avoid Date serialization issues
+    const response = await api.post<Array<{ count: number }>>('/DownloadAnalyzing/_countForItem', {
+        item: conceptId,
+        from: new Date(0).toISOString(),
+        to: new Date().toISOString(),
+    });
+    return response.data?.[0]?.count ?? 0;
 }
 
 /**
@@ -285,4 +316,49 @@ export async function getConceptLatestVersion(concept: string): Promise<string |
     } catch (error) {
         return null;
     }
+}
+
+
+
+/**
+ * Get download count for a concept (aggregated across versions) via backend GET.
+ */
+// Removed GET count helper; rely on backend download sync to increment analytics.
+
+/**
+ * Get concept id by unique_name via registry/all
+ */
+export async function getConceptIdByUniqueName(uniqueName: string): Promise<string | null> {
+    try {
+        const response = await api.post<Array<{ id: string }>>('/ConceptRegistering/_lookup', { unique_name: uniqueName });
+        return response.data?.[0]?.id ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Get all versions for a concept given its unique name.
+ * Returns sorted by createdAt desc.
+ */
+export interface ConceptRegisteringGetVersionsItem { version: number; createdAt: string; }
+export async function getConceptVersions(uniqueName: string): Promise<ConceptRegisteringGetVersionsItem[]> {
+    try {
+        const conceptId = await getConceptIdByUniqueName(uniqueName);
+        if (!conceptId) return [];
+    const response = await api.post<{ versions: { version: number; createdAt: string }[] }[]>('/ConceptRegistering/_getVersions', { concept: conceptId });
+    const arr = response.data[0]?.versions ?? [];
+    return arr.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Publish a new version for an existing concept by unique name using folder upload.
+ * Server enforces ownership via accessToken; returns version id string.
+ */
+export async function publishExistingConceptVersion(uniqueName: string, files: FileList | File[]): Promise<string> {
+    // Reuse the same endpoint as concept creation; backend handles existing vs new flows
+    return publishConceptWithFolder(uniqueName, files);
 }
