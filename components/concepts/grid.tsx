@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Box, ThumbsUp, Download, Zap, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { getAllConcepts, type ConceptItem } from '@/lib/concepts'
+import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery } from '@/lib/concepts'
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
 import { useAuth } from '@/contexts/auth-context'
 import JSZip from 'jszip'
@@ -208,6 +208,7 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [likesMap, setLikesMap] = useState<Record<string, number>>({})
+    const [downloadsMap, setDownloadsMap] = useState<Record<string, number | null>>({})
     const [likedMap, setLikedMap] = useState<Record<string, boolean>>({})
     const { userId, isAuthenticated } = useAuth()
 
@@ -234,6 +235,22 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                 setLikedMap(likedState)
 
                 setConcepts(displayConcepts)
+
+                // Fetch download counts per concept (by uniqueName)
+                const downloadCounts = await Promise.all(
+                    displayConcepts.map(async (c) => {
+                        const uniqueName = c.title.includes('/') ? c.title.split('/').pop()! : c.title
+                        try {
+                            const count = await getConceptDownloadCountViaQuery(uniqueName)
+                            return { id: c.id, count }
+                        } catch {
+                            return { id: c.id, count: 0 }
+                        }
+                    })
+                )
+                const dm: Record<string, number | null> = {}
+                for (const { id, count } of downloadCounts) dm[id] = count
+                setDownloadsMap(dm)
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load concepts')
                 console.error('Error fetching concepts:', err)
@@ -388,12 +405,11 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                                 <div className="flex gap-4">
                                     <button
                                         type="button"
-                                        onClick={() => downloadConcept(concept)}
-                                        className="flex items-center gap-1 hover:text-primary"
-                                        title="Download concept"
+                                        disabled
+                                        className="flex items-center gap-1 text-muted-foreground"
                                     >
                                         <Download className="w-3 h-3" />
-                                        <span>Download</span>
+                                        <span>{downloadsMap[concept.id] == null ? '~' : downloadsMap[concept.id]}</span>
                                     </button>
                                     <button
                                         onClick={() => toggleLike(concept.id)}

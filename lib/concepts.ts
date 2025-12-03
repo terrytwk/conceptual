@@ -1,5 +1,6 @@
 import { api } from './api';
 import { AxiosError } from 'axios';
+import { getAccessToken } from './auth-storage';
 
 /**
  * Concept Registration API functions
@@ -142,9 +143,11 @@ export async function publishConceptWithFolder(
             files: filesMap,
         };
 
+        // Include access token only; do not include concept id here
+        const accessToken = getAccessToken();
         const response = await api.post<PublishConceptWithFolderResponse>(
             '/registry/publish',
-            requestBody
+            accessToken ? { ...requestBody, accessToken } : requestBody
         );
         return response.data.version;
     } catch (error) {

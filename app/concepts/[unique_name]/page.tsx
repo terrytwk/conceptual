@@ -4,7 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { FooterSection } from "@/components/footer-section";
-import { getConceptFiles, getConceptVersions, publishExistingConceptVersion, getAllConcepts, downloadConceptVersion, getConceptDownloadCountViaQuery } from "@/lib/concepts";
+import { getConceptFiles, getConceptVersions, publishExistingConceptVersion, getAllConcepts, downloadConceptVersion, getConceptDownloadCountViaQuery, getConceptIdByUniqueName } from "@/lib/concepts";
+import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from "@/lib/liking";
 import { getUserId, getAccessToken } from "@/lib/auth-storage";
 import { Loader2, FileCode, ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +36,9 @@ export default function ConceptCodeViewerPage() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [conceptId, setConceptId] = useState<string | null>(null);
+  const [likesCount, setLikesCount] = useState<number | null>(null);
+  const [liked, setLiked] = useState<boolean>(false);
 
   useEffect(() => {
     async function load() {
@@ -49,6 +53,29 @@ export default function ConceptCodeViewerPage() {
   const owner = match?.owner || null;
   setOwnerId(owner);
   setIsOwner(!!currentUserId && !!owner && currentUserId === owner);
+
+        // Resolve concept ID for like operations
+        const resolvedConceptId = await getConceptIdByUniqueName(uniqueName);
+        setConceptId(resolvedConceptId);
+
+        // Initialize like count and liked state
+        if (resolvedConceptId) {
+          try {
+            const uid = getUserId();
+            const [count, likedFlag] = await Promise.all([
+              countForItem(resolvedConceptId),
+              uid ? isLiked(resolvedConceptId, uid) : Promise.resolve(false),
+            ]);
+            setLikesCount(count);
+            setLiked(Boolean(likedFlag));
+          } catch {
+            setLikesCount(0);
+            setLiked(false);
+          }
+        } else {
+          setLikesCount(0);
+          setLiked(false);
+        }
 
         // Fetch versions sorted by date desc
   const v = await getConceptVersions(uniqueName);
@@ -178,6 +205,28 @@ export default function ConceptCodeViewerPage() {
     }
   }
 
+  async function toggleLike() {
+    if (!conceptId) return;
+    const uid = getUserId();
+    if (!uid) {
+      alert("Please sign in to like concepts.");
+      return;
+    }
+    if (liked) {
+      const res = await unlikeApi(conceptId, uid);
+      if (!('error' in res)) {
+        setLiked(false);
+        setLikesCount((c) => (c == null ? 0 : Math.max(0, c - 1)));
+      }
+    } else {
+      const res = await likeApi(conceptId, uid);
+      if (!('error' in res)) {
+        setLiked(true);
+        setLikesCount((c) => (c == null ? 1 : c + 1));
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -251,15 +300,27 @@ export default function ConceptCodeViewerPage() {
           <div className="md:col-span-3 border border-border rounded-lg bg-card flex flex-col">
             <div className="px-4 py-3 flex items-center justify-between border-b border-border">
               <div className="text-sm font-medium text-muted-foreground">{selectedPath || "Select a file"}</div>
-              <button
-                type="button"
-                onClick={downloadZip}
-                className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted/60 transition-colors"
-                title="Download selected version as ZIP"
-              >
-                <Download className="w-4 h-4" />
-                Download v{currentVersion ?? "-"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={downloadZip}
+                  className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted/60 transition-colors"
+                  title="Download selected version as ZIP"
+                >
+                  <Download className="w-4 h-4" />
+                  Download v{currentVersion ?? "-"}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleLike}
+                  className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border border-border transition-colors ${liked ? 'text-primary bg-primary/10' : 'hover:bg-muted/60'}`}
+                  title={liked ? "Unlike" : "Like"}
+                >
+                  {/* Using ThumbsUp icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-thumbs-up"><path d="M7 10v12"/><path d="M15 22H9a2 2 0 0 1-2-2"/><path d="M19 8c.46-.88.69-1.85.63-2.83A3.94 3.94 0 0 0 15.62 2H14l-1 7"/><path d="M2 10h4"/><path d="M22 10h-6.3a1 1 0 0 0-.95.68l-3.11 8.54A2 2 0 0 0 13.52 22H19a3 3 0 0 0 3-3v-7a2 2 0 0 0-2-2Z"/></svg>
+                  <span>{likesCount == null ? '~' : likesCount}</span>
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto p-4">
               {loading && (
