@@ -46,13 +46,13 @@ export default function ConceptCodeViewerPage() {
       setLoading(true);
       setError(null);
       try {
-  // Determine ownership
-  const concepts = await getAllConcepts();
-  const match = concepts.find(c => c.uniqueName === uniqueName);
-  const currentUserId = getUserId();
-  const owner = match?.owner || null;
-  setOwnerId(owner);
-  setIsOwner(!!currentUserId && !!owner && currentUserId === owner);
+        // Determine ownership
+        const concepts = await getAllConcepts();
+        const match = concepts.find(c => c.uniqueName === uniqueName);
+        const currentUserId = getUserId();
+        const owner = match?.owner || null;
+        setOwnerId(owner);
+        setIsOwner(!!currentUserId && !!owner && currentUserId === owner);
 
         // Resolve concept ID for like operations
         const resolvedConceptId = await getConceptIdByUniqueName(uniqueName);
@@ -78,7 +78,7 @@ export default function ConceptCodeViewerPage() {
         }
 
         // Fetch versions sorted by date desc
-  const v = await getConceptVersions(uniqueName);
+        const v = await getConceptVersions(uniqueName);
         setVersions(v);
         const defaultVersion = v[0]?.version;
         setCurrentVersion(defaultVersion ?? null);
@@ -92,10 +92,10 @@ export default function ConceptCodeViewerPage() {
           setSelectedPath(entries[0].path);
         }
 
-  // Fetch concept-level download count via query on initial load
-  setConceptCount(null);
-  const fetchedCount = await getConceptDownloadCountViaQuery(uniqueName);
-  setConceptCount(fetchedCount);
+        // Fetch concept-level download count via query on initial load
+        setConceptCount(null);
+        const fetchedCount = await getConceptDownloadCountViaQuery(uniqueName);
+        setConceptCount(fetchedCount);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load files");
       } finally {
@@ -111,7 +111,7 @@ export default function ConceptCodeViewerPage() {
     setError(null);
     try {
       setCurrentVersion(v);
-  // no per-version count fetch needed when switching
+      // no per-version count fetch needed when switching
       const fileMap = await getConceptFiles(uniqueName, v);
       const entries = Object.entries(fileMap).map(([path, content]) => ({ path, content }));
       entries.sort((a, b) => a.path.localeCompare(b.path));
@@ -144,9 +144,9 @@ export default function ConceptCodeViewerPage() {
       if (typeof latest === 'number') {
         await switchVersion(latest);
       }
-  // refresh concept-level count after upload
-  // Refresh concept-level count from backend query
-  setConceptCount(await getConceptDownloadCountViaQuery(uniqueName));
+      // refresh concept-level count after upload
+      // Refresh concept-level count from backend query
+      setConceptCount(await getConceptDownloadCountViaQuery(uniqueName));
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to publish version');
     } finally {
@@ -178,12 +178,7 @@ export default function ConceptCodeViewerPage() {
         alert("No version selected.");
         return;
       }
-      const token = getAccessToken();
-      if (!token) {
-        alert("Please sign in to download.");
-        return;
-      }
-      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion, token);
+      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion);
       const zip = new JSZip();
       for (const [path, content] of Object.entries(versionFiles)) {
         zip.file(path, content);
@@ -197,8 +192,8 @@ export default function ConceptCodeViewerPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-  // Increment concept-level count locally after successful download
-  setConceptCount((c) => (c == null ? 1 : c + 1));
+      // Increment concept-level count locally after successful download
+      setConceptCount((c) => (c == null ? 1 : c + 1));
     } catch (e) {
       console.error(e);
       alert("Download failed. Please try again later.");
@@ -317,7 +312,7 @@ export default function ConceptCodeViewerPage() {
                   title={liked ? "Unlike" : "Like"}
                 >
                   {/* Using ThumbsUp icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-thumbs-up"><path d="M7 10v12"/><path d="M15 22H9a2 2 0 0 1-2-2"/><path d="M19 8c.46-.88.69-1.85.63-2.83A3.94 3.94 0 0 0 15.62 2H14l-1 7"/><path d="M2 10h4"/><path d="M22 10h-6.3a1 1 0 0 0-.95.68l-3.11 8.54A2 2 0 0 0 13.52 22H19a3 3 0 0 0 3-3v-7a2 2 0 0 0-2-2Z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-thumbs-up"><path d="M7 10v12" /><path d="M15 22H9a2 2 0 0 1-2-2" /><path d="M19 8c.46-.88.69-1.85.63-2.83A3.94 3.94 0 0 0 15.62 2H14l-1 7" /><path d="M2 10h4" /><path d="M22 10h-6.3a1 1 0 0 0-.95.68l-3.11 8.54A2 2 0 0 0 13.52 22H19a3 3 0 0 0 3-3v-7a2 2 0 0 0-2-2Z" /></svg>
                   <span>{likesCount == null ? '~' : likesCount}</span>
                 </button>
               </div>
@@ -331,7 +326,7 @@ export default function ConceptCodeViewerPage() {
               )}
               {!loading && !error && selectedFile && (
                 <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono text-foreground bg-muted/40 p-4 rounded-md border border-border">
-{selectedFile.content}
+                  {selectedFile.content}
                 </pre>
               )}
               {!loading && !error && !selectedFile && files.length > 0 && (
@@ -341,7 +336,7 @@ export default function ConceptCodeViewerPage() {
           </div>
         </div>
       </main>
-  <div className="mt-12">
+      <div className="mt-12">
         <FooterSection />
       </div>
     </div>
