@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, ThumbsUp, Download, Zap, Loader2 } from 'lucide-react'
+import { Box, ThumbsUp, Download, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery } from '@/lib/concepts'
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
@@ -262,6 +262,16 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
         fetchConcepts()
     }, [refreshKey, isAuthenticated, userId])
 
+    // Compute leaderboard values for badges
+    const maxDownloads = (() => {
+        const nums = Object.values(downloadsMap).filter((v): v is number => typeof v === 'number')
+        return nums.length ? Math.max(...nums) : 0
+    })()
+    const maxLikes = (() => {
+        const nums = Object.values(likesMap)
+        return nums.length ? Math.max(...nums) : 0
+    })()
+
     const filteredConcepts = concepts.filter((concept) => {
         const matchesSearch = concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             concept.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -358,71 +368,81 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                     </p>
                 </div>
             ) : (
-        <div className="space-y-3">
+                <div className="space-y-3">
                     {filteredConcepts.map((concept) => {
-                        // concept.title formatted as author/uniqueName or uniqueName; extract uniqueName (after last '/')
-                        const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title;
+                        const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title
+                        const downloads = downloadsMap[concept.id] ?? 0
+                        const likes = likesMap[concept.id] ?? 0
+                        const isPopular = downloads > 0 && downloads === maxDownloads
+                        const isMostLiked = likes > 0 && likes === maxLikes
+
                         return (
-            <div
-                            key={concept.id}
-                            className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-start gap-3 flex-1">
-                                    <div className="mt-1">
-                                        <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <div
+                                key={concept.id}
+                                className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
+                            >
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <div className="mt-1">
+                                            <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <a href={`/concepts/${uniqueName}`} className="font-semibold text-foreground group-hover:text-primary transition-colors hover:underline">
+                                                {concept.title}
+                                            </a>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                {concept.description}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <a href={`/concepts/${uniqueName}`} className="font-semibold text-foreground group-hover:text-primary transition-colors hover:underline">
-                                            {concept.title}
-                                        </a>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            {concept.description}
-                                        </p>
+                                    {/* Dynamic badges replacing Featured */}
+                                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                                        {isPopular && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
+                                                <Download className="w-3 h-3" />
+                                                Popular
+                                            </div>
+                                        )}
+                                        {isMostLiked && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
+                                                <ThumbsUp className="w-3 h-3" />
+                                                Most liked
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                {concept.featured && (
-                                    <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium ml-2 shrink-0">
-                                        <Zap className="w-3 h-3" />
-                                        Featured
+
+                                <div className="flex flex-wrap gap-2 mt-3 mb-3">
+                                    {concept.tags.map((tag) => (
+                                        <span
+                                            key={tag}
+                                            className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
+                                        >
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
+                                    <div className="flex gap-4">
+                                        <button type="button" disabled className="flex items-center gap-1 text-muted-foreground">
+                                            <Download className="w-3 h-3" />
+                                            <span>{downloadsMap[concept.id] == null ? '~' : downloadsMap[concept.id]}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => toggleLike(concept.id)}
+                                            disabled={!isAuthenticated}
+                                            className={`flex items-center gap-1 ${likedMap[concept.id] ? 'text-primary' : ''}`}
+                                        >
+                                            <ThumbsUp className="w-3 h-3" />
+                                            <span>{(likesMap[concept.id] ?? 0)}</span>
+                                        </button>
                                     </div>
-                                )}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 mt-3 mb-3">
-                                {concept.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
-                                <div className="flex gap-4">
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="flex items-center gap-1 text-muted-foreground"
-                                    >
-                                        <Download className="w-3 h-3" />
-                                        <span>{downloadsMap[concept.id] == null ? '~' : downloadsMap[concept.id]}</span>
-                                    </button>
-                                    <button
-                                        onClick={() => toggleLike(concept.id)}
-                                        disabled={!isAuthenticated}
-                                        className={`flex items-center gap-1 ${likedMap[concept.id] ? 'text-primary' : ''}`}
-                                    >
-                                        <ThumbsUp className="w-3 h-3" />
-                                        <span>{(likesMap[concept.id] ?? 0)}</span>
-                                    </button>
                                 </div>
                             </div>
-                        </div>
-                    )})}
+                        )
+                    })}
                 </div>
             )}
         </div>
