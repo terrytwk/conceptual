@@ -250,16 +250,62 @@ export async function getConceptFiles(uniqueName: string, version?: number): Pro
 }
 
 /**
- * Download a specific version via backend sync (records analytics).
- * Expects server to return { files: Record<string,string> } similar to registry/files.
+ * Resolve author username by unique name using registry/all (best-effort).
  */
-export async function downloadConceptVersion(uniqueName: string, version: number, accessToken?: string): Promise<Record<string, string>> {
-    try {
-    const response = await api.post<{ files: Record<string, string> }>("/concepts/download/version", { unique_name: uniqueName, version, accessToken });
-        return response.data.files || {};
-    } catch (error) {
-        return {};
+async function getAuthorUsernameByUniqueName(uniqueName: string): Promise<string | null> {
+  try {
+    const concepts = await getAllConcepts();
+    const match = concepts.find((c) => c.uniqueName === uniqueName);
+    const username = match?.authorUsername?.trim();
+    return username ? username : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Download a specific version via backend sync (records analytics).
+ * Calls the download sync with required author_username; falls back to registry/files on failure.
+ */
+export async function downloadConceptVersion(
+  uniqueName: string,
+  version: number,
+  accessToken?: string
+): Promise<Record<string, string>> {
+  // Try server download sync (records analytics). If it fails, fallback.
+  try {
+    const authorUsername = await getAuthorUsernameByUniqueName(uniqueName);
+    const body: { unique_name: string; version: number; accessToken?: string; author_username?: string } = {
+      unique_name: uniqueName,
+      version,
+    };
+    if (accessToken) body.accessToken = accessToken;
+    if (authorUsername) body.author_username = authorUsername;
+
+    const response = await api.post<{ files: Record<string, string> }>(
+      "/concepts/download/version",
+      body,
+      { timeout: 8000 }
+    );
+    const files = response.data?.files ?? {};
+    if (files && Object.keys(files).length > 0) {
+      return files;
     }
+    // If empty, try fallback below
+  } catch {
+    // Ignore and try fallback
+  }
+
+  // Fallback: fetch files from registry (no analytics)
+  try {
+    const res = await api.post<RegistryFilesResponse>("/registry/files", {
+      unique_name: uniqueName,
+      version,
+    });
+    return res.data?.files ?? {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -267,15 +313,16 @@ export async function downloadConceptVersion(uniqueName: string, version: number
  * Resolves concept id by unique_name, then posts item + date range.
  */
 export async function getConceptDownloadCountViaQuery(uniqueName: string): Promise<number> {
-    const conceptId = await getConceptIdByUniqueName(uniqueName);
-    if (!conceptId) return 0;
-    // Send ISO strings to avoid Date serialization issues
-    const response = await api.post<Array<{ count: number }>>('/DownloadAnalyzing/_countForItem', {
-        item: conceptId,
-        from: new Date(0).toISOString(),
-        to: new Date().toISOString(),
+  const conceptId = await getConceptIdByUniqueName(uniqueName);
+  if (!conceptId) return 0;
+  try {
+    const response = await api.post<Array<{ count: number }>>("/DownloadAnalyzing/_countForItem", {
+      item: conceptId,
     });
     return response.data?.[0]?.count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**

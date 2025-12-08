@@ -173,12 +173,12 @@ export default function ConceptCodeViewerPage() {
         alert("No files in latest version to download.");
         return;
       }
-      // Fetch via backend sync to record analytics
       if (currentVersion == null) {
         alert("No version selected.");
         return;
       }
-      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion);
+      const token = getAccessToken(); // optional
+      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion, token || undefined);
       const zip = new JSZip();
       for (const [path, content] of Object.entries(versionFiles)) {
         zip.file(path, content);
@@ -192,8 +192,14 @@ export default function ConceptCodeViewerPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      // Increment concept-level count locally after successful download
-      setConceptCount((c) => (c == null ? 1 : c + 1));
+      // Always refresh concept-level count from backend after successful download
+      try {
+        const refreshed = await getConceptDownloadCountViaQuery(uniqueName);
+        setConceptCount(refreshed);
+      } catch {
+        // Fallback: optimistic local increment
+        setConceptCount((c) => (c == null ? 1 : c + 1));
+      }
     } catch (e) {
       console.error(e);
       alert("Download failed. Please try again later.");
