@@ -196,8 +196,8 @@ function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
         id: apiConcept.concept,
         title: displayTitle,
         owner: apiConcept.owner,
-    latestVersion: latestVersion?.semver,
-    latestArtifactUrl: latestVersion?.artifactUrl,
+        latestVersion: latestVersion?.semver,
+        latestArtifactUrl: latestVersion?.artifactUrl,
         versionCount: apiConcept.versions.length,
         ...dummyData,
         updated: updatedDate, // Override dummy updated with real published date
@@ -458,7 +458,7 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey, sortBy
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2 mt-3 mb-3">
+                                {/* <div className="flex flex-wrap gap-2 mt-3 mb-3">
                                     {concept.tags.map((tag) => (
                                         <span
                                             key={tag}
@@ -467,7 +467,7 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey, sortBy
                                             {tag}
                                         </span>
                                     ))}
-                                </div>
+                                </div> */}
 
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <span>

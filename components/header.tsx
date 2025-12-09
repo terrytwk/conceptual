@@ -28,7 +28,7 @@ export function Header() {
     username: string
     avatarUrl: string
   } | null>(null)
-  
+
   const navItems = [
     { name: "Concepts", href: "/concepts" },
     { name: "Features", href: "/features" },
@@ -87,7 +87,7 @@ export function Header() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          <form onSubmit={handleSearch} className="hidden lg:flex items-center">
+          {/* <form onSubmit={handleSearch} className="hidden lg:flex items-center">
             <div className="flex items-center bg-muted border border-border rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-ring transition-all w-64">
               <Search className="h-5 w-5 text-muted-foreground mr-2" />
               <input
@@ -98,7 +98,7 @@ export function Header() {
                 className="bg-transparent text-foreground placeholder:text-muted-foreground outline-none flex-1"
               />
             </div>
-          </form>
+          </form> */}
           {!isLoading && (
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated ? (
