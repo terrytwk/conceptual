@@ -15,7 +15,8 @@ import { useAuth } from '@/contexts/auth-context'
 export default function ConceptsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedCategory, setSelectedCategory] = useState('all')
-    const [sortBy, setSortBy] = useState('trending')
+    const [sortBy, setSortBy] = useState<'likes_desc' | 'likes_asc' | 'downloads_desc' | 'downloads_asc' | 'date_desc' | 'date_asc'>('date_desc')
+    const [sortOpen, setSortOpen] = useState(false)
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
     const { isAuthenticated } = useAuth()
@@ -54,17 +55,22 @@ export default function ConceptsPage() {
                             />
                         </div>
                         <div className="flex gap-2 items-center">
-                            <button className="px-3 py-2 text-sm font-medium bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors">
-                                Full-text search
-                            </button>
-                            <div className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-primary/10 text-primary rounded-md cursor-pointer hover:bg-primary/15 transition-colors">
-                                <span>⭐</span>
-                                <span>Most liked</span>
-                            </div>
-                            <div className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-muted text-foreground rounded-md cursor-pointer hover:bg-muted/80 transition-colors">
-                                <span>Sort: Trending</span>
-                                <ChevronDown className="w-4 h-4" />
-                            </div>
+                            <div className="relative">
+                                                                <button onClick={() => setSortOpen((o)=>!o)} className="flex items-center gap-1 px-3 py-2 text-sm font-medium bg-card text-foreground rounded-md hover:bg-muted/80 transition-colors border border-border">
+                                                                        <span>Sort: {sortBy === 'likes_desc' ? 'Most likes' : sortBy === 'likes_asc' ? 'Least likes' : sortBy === 'downloads_desc' ? 'Most downloads' : sortBy === 'downloads_asc' ? 'Least downloads' : sortBy === 'date_desc' ? 'Newest' : 'Oldest'}</span>
+                                                                        <ChevronDown className="w-4 h-4" />
+                                                                </button>
+                                                                                                {sortOpen && (
+                                                                                                    <div className="absolute right-0 mt-2 w-56 rounded-md border border-border bg-background shadow-md z-50">
+                                                                        <button onClick={() => { setSortBy('likes_desc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Most likes</button>
+                                                                        <button onClick={() => { setSortBy('likes_asc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Least likes</button>
+                                                                        <button onClick={() => { setSortBy('downloads_desc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Most downloads</button>
+                                                                        <button onClick={() => { setSortBy('downloads_asc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Least downloads</button>
+                                                                        <button onClick={() => { setSortBy('date_desc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Newest</button>
+                                                                        <button onClick={() => { setSortBy('date_asc'); setSortOpen(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-muted/60">Oldest</button>
+                                                                    </div>
+                                                                )}
+                                                        </div>
                         </div>
                     </div>
                 </div>
@@ -82,6 +88,7 @@ export default function ConceptsPage() {
                             searchQuery={searchQuery}
                             selectedCategory={selectedCategory}
                             refreshKey={refreshKey}
+                            sortBy={sortBy}
                         />
                     </div>
 

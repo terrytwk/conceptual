@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Box, ThumbsUp, Download, Loader2 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery } from '@/lib/concepts'
+import { format } from 'date-fns'
+import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery, getConceptVersions } from '@/lib/concepts'
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
 import { useAuth } from '@/contexts/auth-context'
 import JSZip from 'jszip'
@@ -13,6 +13,7 @@ interface ConceptsGridProps {
     searchQuery: string
     selectedCategory: string
     refreshKey?: number
+    sortBy?: 'likes_desc' | 'likes_asc' | 'downloads_desc' | 'downloads_asc' | 'date_desc' | 'date_asc'
 }
 
 interface Concept {
@@ -203,7 +204,7 @@ function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
     }
 }
 
-export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: ConceptsGridProps) {
+export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey, sortBy = 'date_desc' }: ConceptsGridProps) {
     const [concepts, setConcepts] = useState<Concept[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -234,7 +235,20 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                 }
                 setLikedMap(likedState)
 
-                setConcepts(displayConcepts)
+                // Resolve latest version dates from backend per unique name
+                const updatedWithVersions = await Promise.all(displayConcepts.map(async (c) => {
+                    const uniqueName = c.title.includes('/') ? c.title.split('/').pop()! : c.title
+                    try {
+                        const versions = await getConceptVersions(uniqueName)
+                        const latest = versions[0]
+                        const updatedDate = latest ? new Date(latest.createdAt) : c.updated
+                        return { ...c, updated: updatedDate, versionCount: versions.length }
+                    } catch {
+                        return c
+                    }
+                }))
+
+                setConcepts(updatedWithVersions)
 
                 // Fetch download counts per concept (by uniqueName)
                 const downloadCounts = await Promise.all(
@@ -272,11 +286,43 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
         return nums.length ? Math.max(...nums) : 0
     })()
 
-    const filteredConcepts = concepts.filter((concept) => {
+    let filteredConcepts = concepts.filter((concept) => {
         const matchesSearch = concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             concept.description.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true)
+        const isYours = selectedCategory === 'yours' && isAuthenticated && userId && concept.owner === userId
+        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true) || isYours
         return matchesSearch && matchesCategory
+    })
+
+    // Apply sorting
+    filteredConcepts = filteredConcepts.slice().sort((a, b) => {
+        switch (sortBy) {
+            case 'likes_desc': {
+                const la = likesMap[a.id] ?? 0
+                const lb = likesMap[b.id] ?? 0
+                return lb - la
+            }
+            case 'likes_asc': {
+                const la = likesMap[a.id] ?? 0
+                const lb = likesMap[b.id] ?? 0
+                return la - lb
+            }
+            case 'downloads_desc': {
+                const da = downloadsMap[a.id] ?? 0
+                const db = downloadsMap[b.id] ?? 0
+                return (db ?? 0) - (da ?? 0)
+            }
+            case 'downloads_asc': {
+                const da = downloadsMap[a.id] ?? 0
+                const db = downloadsMap[b.id] ?? 0
+                return (da ?? 0) - (db ?? 0)
+            }
+            case 'date_asc':
+                return a.updated.getTime() - b.updated.getTime()
+            case 'date_desc':
+            default:
+                return b.updated.getTime() - a.updated.getTime()
+        }
     })
 
     const downloadConcept = async (concept: Concept) => {
@@ -424,7 +470,9 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                                 </div>
 
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
+                                    <span>
+                                        {format(concept.updated, 'yyyy-MM-dd HH:mm')}
+                                    </span>
                                     <div className="flex gap-4">
                                         <button type="button" disabled className="flex items-center gap-1 text-muted-foreground">
                                             <Download className="w-3 h-3" />

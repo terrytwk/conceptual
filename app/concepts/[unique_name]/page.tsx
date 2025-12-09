@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Header } from "@/components/header";
 import { FooterSection } from "@/components/footer-section";
-import { getConceptFiles, getConceptVersions, publishExistingConceptVersion, getAllConcepts, downloadConceptVersion, getConceptDownloadCountViaQuery, getConceptIdByUniqueName } from "@/lib/concepts";
+import { getConceptFiles, getConceptVersions, publishExistingConceptVersion, getAllConcepts, downloadConceptVersion, getConceptDownloadCountViaQuery, getConceptIdByUniqueName, getReadmeByConceptId, generateReadmeByConceptId } from "@/lib/concepts";
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from "@/lib/liking";
 import { getUserId, getAccessToken } from "@/lib/auth-storage";
 import { Loader2, FileCode, ArrowLeft, Download } from "lucide-react";
@@ -39,6 +39,29 @@ export default function ConceptCodeViewerPage() {
   const [conceptId, setConceptId] = useState<string | null>(null);
   const [likesCount, setLikesCount] = useState<number | null>(null);
   const [liked, setLiked] = useState<boolean>(false);
+  const [readme, setReadme] = useState<string | null>(null);
+  const [showReadme, setShowReadme] = useState<boolean>(true);
+
+  async function fetchReadmeWithRetry(conceptId: string, attempts = 3, delayMs = 400): Promise<void> {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const r = await getReadmeByConceptId(conceptId);
+        if (r && 'content' in r && r.content) {
+          setReadme(r.content);
+          return;
+        }
+      } catch {}
+      // wait before next attempt
+      await new Promise(res => setTimeout(res, delayMs));
+    }
+    // final attempt fallback
+    try {
+      const r = await getReadmeByConceptId(conceptId);
+      setReadme(r && 'content' in r ? r.content || null : null);
+    } catch {
+      setReadme(null);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -88,8 +111,19 @@ export default function ConceptCodeViewerPage() {
         // Sort: show folders/files alphabetically
         entries.sort((a, b) => a.path.localeCompare(b.path));
         setFiles(entries);
-        if (entries.length > 0) {
-          setSelectedPath(entries[0].path);
+        const preferred = entries.find(e => /(^|\/)README\.md$/i.test(e.path))?.path || entries[0]?.path || null;
+        setSelectedPath(preferred);
+
+        // Load README via backend get endpoint
+        try {
+          const cid = await getConceptIdByUniqueName(uniqueName);
+          if (cid) {
+            await fetchReadmeWithRetry(cid, 2, 300);
+          } else {
+            setReadme(null);
+          }
+        } catch {
+          setReadme(null);
         }
 
         // Fetch concept-level download count via query on initial load
@@ -116,7 +150,18 @@ export default function ConceptCodeViewerPage() {
       const entries = Object.entries(fileMap).map(([path, content]) => ({ path, content }));
       entries.sort((a, b) => a.path.localeCompare(b.path));
       setFiles(entries);
-      setSelectedPath(entries[0]?.path ?? null);
+      const preferred = entries.find(e => /(^|\/)README\.md$/i.test(e.path))?.path || entries[0]?.path || null;
+      setSelectedPath(preferred);
+      try {
+        const cid = await getConceptIdByUniqueName(uniqueName);
+        if (cid) {
+          await fetchReadmeWithRetry(cid, 2, 300);
+        } else {
+          setReadme(null);
+        }
+      } catch {
+        setReadme(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load files");
     } finally {
@@ -311,6 +356,31 @@ export default function ConceptCodeViewerPage() {
                   <Download className="w-4 h-4" />
                   Download v{currentVersion ?? "-"}
                 </button>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        // Pass current version files to help generation quality
+                        const token = getAccessToken() || undefined;
+                        const conceptId = await getConceptIdByUniqueName(uniqueName);
+                        if (!conceptId) return;
+                        const fileMap = currentVersion != null
+                          ? await getConceptFiles(uniqueName, currentVersion)
+                          : await getConceptFiles(uniqueName);
+                        await generateReadmeByConceptId(conceptId, true, { files: fileMap, displayName: uniqueName, accessToken: token });
+                        // Immediately re-fetch with small retry to pick up new content without full page reload
+                        await fetchReadmeWithRetry(conceptId, 3, 350);
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted/60 transition-colors"
+                    title="Regenerate README"
+                  >
+                    Regenerate README
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={toggleLike}
@@ -323,6 +393,29 @@ export default function ConceptCodeViewerPage() {
                 </button>
               </div>
             </div>
+            {/* README dropdown at top */}
+            <div className="px-4 py-3 border-b border-border">
+              <button
+                type="button"
+                className="w-full text-left text-sm px-3 py-2 rounded-md border border-border hover:bg-muted/60 transition-colors flex items-center justify-between"
+                onClick={() => setShowReadme((v) => !v)}
+                title="Toggle README"
+              >
+                <span className="font-medium">README.md</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`lucide lucide-chevron-${showReadme ? 'up' : 'down'}`}><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              {showReadme && readme && (
+                <div className="mt-3">
+                  <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono text-foreground bg-muted/40 p-4 rounded-md border border-border">
+                    {readme}
+                  </pre>
+                </div>
+              )}
+              {showReadme && !readme && (
+                <div className="mt-3 text-xs text-muted-foreground">No README found.</div>
+              )}
+            </div>
+
             <div className="flex-1 overflow-auto p-4">
               {loading && (
                 <div className="flex items-center justify-center py-12 text-sm text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mr-2" />Loading content...</div>
