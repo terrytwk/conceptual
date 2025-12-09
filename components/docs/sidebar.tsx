@@ -5,7 +5,14 @@ import Link from "next/link"
 import { ChevronDown } from 'lucide-react'
 
 export function DocsSidebar() {
-    const [expandedSections, setExpandedSections] = useState<string[]>(["getting-started"])
+    const [expandedSections, setExpandedSections] = useState<string[]>([
+        "getting-started",
+        "concept-design",
+        "specifications",
+        "implementation",
+        "synchronizations",
+        "testing"
+    ])
 
     const toggleSection = (id: string) => {
         setExpandedSections((prev) =>
@@ -18,44 +25,61 @@ export function DocsSidebar() {
             id: "getting-started",
             title: "Getting Started",
             items: [
-                { label: "Introduction", href: "#introduction" },
-                { label: "Installation", href: "#installation" },
-                { label: "Quick Start", href: "#quick-start" },
+                { label: "Running the Server", href: "#running-server" },
+                { label: "Running Tests", href: "#running-tests" },
             ],
         },
         {
-            id: "features",
-            title: "Features",
+            id: "concept-design",
+            title: "Concept Design",
             items: [
-                { label: "Code Reviews", href: "#code-reviews" },
-                { label: "Integrations", href: "#integrations" },
-                { label: "Real-time Previews", href: "#previews" },
+                { label: "Overview", href: "#concept-design-overview" },
+                { label: "What is a concept?", href: "#what-is-a-concept" },
+                { label: "Independence", href: "#concept-independence" },
+                { label: "Separation of Concerns", href: "#separation-of-concerns" },
+                { label: "Composition", href: "#composition-by-synchronization" },
             ],
         },
         {
-            id: "guides",
-            title: "Guides",
+            id: "specifications",
+            title: "Specifications",
             items: [
-                { label: "Authentication", href: "#authentication" },
-                { label: "API Setup", href: "#api-setup" },
-                { label: "Deployment", href: "#deployment" },
+                { label: "Structure", href: "#spec-structure" },
+                { label: "Purpose", href: "#spec-purpose" },
+                { label: "Principle", href: "#spec-principle" },
+                { label: "State", href: "#spec-state" },
+                { label: "Actions", href: "#spec-actions" },
+                { label: "Queries", href: "#spec-queries" },
             ],
         },
         {
-            id: "api",
-            title: "API Reference",
+            id: "implementation",
+            title: "Implementation",
             items: [
-                { label: "Endpoints", href: "#endpoints" },
-                { label: "Authentication", href: "#api-auth" },
-                { label: "Error Handling", href: "#errors" },
+                { label: "Overview", href: "#impl-overview" },
+                { label: "Managing IDs", href: "#impl-ids" },
+                { label: "State & Actions", href: "#impl-state-actions" },
+                { label: "Dictionaries", href: "#impl-dictionaries" },
+                { label: "Setup", href: "#impl-setup" },
             ],
         },
         {
-            id: "faq",
-            title: "FAQ",
+            id: "synchronizations",
+            title: "Synchronizations",
             items: [
-                { label: "Common Questions", href: "#questions" },
-                { label: "Troubleshooting", href: "#troubleshooting" },
+                { label: "Overview", href: "#sync-overview" },
+                { label: "Example", href: "#sync-example" },
+                { label: "Frames", href: "#sync-frames" },
+                { label: "Pattern Matching", href: "#sync-pattern-matching" },
+                { label: "Common Pitfalls", href: "#sync-pitfalls" },
+            ],
+        },
+        {
+            id: "testing",
+            title: "Testing",
+            items: [
+                { label: "Approach", href: "#testing-approach" },
+                { label: "Implementation", href: "#testing-implementation" },
             ],
         },
     ]
