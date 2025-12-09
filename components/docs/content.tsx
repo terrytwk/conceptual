@@ -10,6 +10,18 @@ export function DocsContent() {
                 <section id="getting-started" className="scroll-mt-24">
                     <h1 className="text-4xl font-bold text-foreground mb-4">Getting Started</h1>
 
+                    <div id="backend-setup" className="mt-4 scroll-mt-24">
+                        <h2 className="text-2xl font-bold text-foreground mb-4">Initialize the Base Backend</h2>
+                        <p className="text-muted-foreground leading-relaxed mb-4">
+                            To start with an empty base backend repository, clone the following repo, then you can use the CLI:
+                        </p>
+                        <div className="bg-muted border border-border rounded-lg p-4 mb-4">
+                            <pre className="text-sm text-foreground overflow-x-auto">
+                                <code>{`git clone git@github.com:ameng10/Conceptual_Base_Repo.git`}</code>
+                            </pre>
+                        </div>
+                    </div>
+
                     <div id="running-server" className="mt-8 scroll-mt-24">
                         <h2 className="text-2xl font-bold text-foreground mb-4">Running the Server</h2>
                         <p className="text-muted-foreground leading-relaxed mb-4">
@@ -20,7 +32,7 @@ export function DocsContent() {
                                 <code>{`deno task import`}</code>
                             </pre>
                         </div>
-                        
+
                         <p className="text-muted-foreground leading-relaxed mb-4">
                             Start the main application server:
                         </p>
@@ -108,11 +120,11 @@ export function DocsContent() {
                         <div className="bg-muted border border-border rounded-lg p-4 my-4">
                             <pre className="text-sm text-foreground overflow-x-auto">
                                 <code>{`sync CascadePostDeletion
-when 
+when
     Post.delete (p)
-where 
+where
     in Comment: target of c is p
-then 
+then
     Comment.delete (c)`}</code>
                             </pre>
                         </div>
@@ -233,7 +245,7 @@ const item = {
                                 <code>{`export default class LabelingConcept {
   items: Collection<Items>;
   labels: Collection<Labels>;
-  
+
   constructor(private readonly db: Db) {
     this.items = this.db.collection(PREFIX + "items");
     this.labels = this.db.collection(PREFIX + "labels");
