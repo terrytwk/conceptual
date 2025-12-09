@@ -8,10 +8,10 @@ interface ConceptsSidebarProps {
 
 const baseCategories = [
     { id: 'all', label: 'All Concepts' },
-    { id: 'user-management', label: 'User Management' },
-    { id: 'social', label: 'Social' },
-    { id: 'content', label: 'Content' },
-    { id: 'interaction', label: 'Interaction' },
+    // { id: 'user-management', label: 'User Management' },
+    // { id: 'social', label: 'Social' },
+    // { id: 'content', label: 'Content' },
+    // { id: 'interaction', label: 'Interaction' },
 ]
 
 export function ConceptsSidebar({ selectedCategory, onSelectCategory }: ConceptsSidebarProps) {
