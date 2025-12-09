@@ -39,6 +39,7 @@ export default function ConceptCodeViewerPage() {
   const [conceptId, setConceptId] = useState<string | null>(null);
   const [likesCount, setLikesCount] = useState<number | null>(null);
   const [liked, setLiked] = useState<boolean>(false);
+  const [authorUsername, setAuthorUsername] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -51,7 +52,9 @@ export default function ConceptCodeViewerPage() {
         const match = concepts.find(c => c.uniqueName === uniqueName);
         const currentUserId = getUserId();
         const owner = match?.owner || null;
+        const authorUsernameValue = match?.authorUsername || null;
         setOwnerId(owner);
+        setAuthorUsername(authorUsernameValue);
         setIsOwner(!!currentUserId && !!owner && currentUserId === owner);
 
         // Resolve concept ID for like operations
@@ -178,7 +181,11 @@ export default function ConceptCodeViewerPage() {
         alert("No version selected.");
         return;
       }
-      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion);
+      if (!authorUsername) {
+        alert("Author username not available. Cannot download.");
+        return;
+      }
+      const versionFiles = await downloadConceptVersion(uniqueName, currentVersion, authorUsername);
       const zip = new JSZip();
       for (const [path, content] of Object.entries(versionFiles)) {
         zip.file(path, content);

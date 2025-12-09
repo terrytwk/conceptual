@@ -138,7 +138,7 @@ Records and analyzes download events. Downloads are tracked per concept (using t
 
 #### `POST /api/DownloadAnalyzing/record`
 
-Records a download event for an item (typically a concept ID). When users download concept versions via `/concepts/download/version`, the system records the download using the concept ID, not the specific version ID. **Note:** Authentication is required for concept downloads via `/concepts/download/version` - the endpoint requires a valid Bearer token in the Authorization header.
+Records a download event for an item (typically a concept ID). When users download concept versions via `/concepts/download/version`, the system records the download using the concept ID, not the specific version ID. **Note:** Authentication is optional for concept downloads via `/concepts/download/version` - downloads work without authentication, but are only tracked for analytics when a user is authenticated.
 
 **Request Body:**
 ```json
@@ -192,26 +192,29 @@ Query: Returns the total count of all downloads for an item (concept). This retu
 
 #### `POST /api/concepts/download/version`
 
-Downloads a specific version of a concept by unique name. If no version is specified, downloads the latest version. This endpoint authenticates the user and records the download for analytics.
+Downloads a specific version of a concept by unique name. If no version is specified, downloads the latest version. **Authentication is optional** - downloads work without authentication, but downloads are only tracked for analytics when a user is authenticated. The endpoint validates that the concept's author username matches the provided `author_username` to ensure concepts are only downloaded from the correct author.
 
 **Headers:**
-- `Authorization: Bearer <accessToken>` (required)
+- `Authorization: Bearer <accessToken>` (optional)
 - `Content-Type: application/json`
 
 **Request Body:**
 ```json
 {
   "unique_name": "username/MyConcept",
+  "author_username": "johndoe",
   "version": 2
 }
 ```
 
 **Note:**
 - `unique_name` (string, required): The unique name of the concept to download. Can be in the format `username/concept_name` (e.g., `"johndoe/MyConcept"`) or just `concept_name` if the concept is globally unique. The CLI tool uses the `username/concept_name` format.
+- `author_username` (string, required): The username of the concept's author. The endpoint validates that the concept's author username matches this value. If the author username does not match, the download will fail with an empty files response.
 - `version` (number, optional): The specific version number to download. If omitted, downloads the latest version. Version numbers are integers (e.g., `1`, `2`, `10`).
-- Authentication is **required** - a valid Bearer token must be provided in the Authorization header
-- The download is automatically recorded in DownloadAnalyzing using the concept ID (not version ID)
+- Authentication is **optional** - if a valid Bearer token is provided, the download will be tracked in DownloadAnalyzing for analytics. Without authentication, the download still works but is not tracked.
+- Downloads are recorded per concept (using the concept ID), not per version
 - Files are returned as decoded UTF-8 strings when possible, or base64-encoded for binary files
+- **Author validation**: The endpoint verifies that the concept's author (retrieved via `ConceptRegistering._getAuthor`) has a username (retrieved via `UserProfileDisplaying._profileOf`) that matches the provided `author_username`. If validation fails, an empty files object is returned.
 
 **Response:**
 ```json
@@ -226,12 +229,16 @@ Downloads a specific version of a concept by unique name. If no version is speci
 ```
 
 **Error Responses:**
-- `{ "error": "..." }` (401) - Authentication required (if no valid access token provided)
-- `{ "error": "Access token expired" }` (401)
-- `{ "error": "Invalid token signature" }` (401)
-- `{ "error": "Session not found or revoked" }` (401)
-- `{ "error": "Invalid access token" }` (401)
-- Concept not found or version not found errors (typically returns empty response or error)
+- Returns empty `files` object if:
+  - Concept not found (404)
+  - Author not found for the concept
+  - Author's profile/username not found
+  - Author username mismatch (the provided `author_username` does not match the concept's author username)
+  - Version not found
+- Timeout errors (504) if the sync fails to respond within the timeout period
+- `{ "error": "Invalid token signature" }` (401) - if authentication token is invalid
+- `{ "error": "Session not found or revoked" }` (401) - if authentication session is invalid
+- `{ "error": "Invalid access token" }` (401) - if access token is invalid
 
 **Example using curl:**
 ```bash
@@ -239,7 +246,8 @@ curl -X POST http://localhost:8000/api/concepts/download/version \
   -H "Authorization: Bearer <accessToken>" \
   -H "Content-Type: application/json" \
   -d '{
-    "unique_name": "MyConcept",
+    "unique_name": "johndoe/MyConcept",
+    "author_username": "johndoe",
     "version": 2
   }'
 ```
@@ -844,8 +852,10 @@ Downloads a concept from the hub and installs it in the local workspace. The use
 
 **Request:**
 - Constructs `unique_name` from `{USERNAME}/{CONCEPT_NAME}` format
+- Sends `author_username` extracted from the `{USERNAME}` part of the command
 - Sends version number if specified (integer only, e.g., `1`, `2`, `10`)
-- Uses stored access token from `conceptual login` for authentication
+- Uses stored access token from `conceptual login` for authentication (optional)
+- The endpoint validates that the concept's author username matches the provided `author_username`
 
 **Response Processing:**
 - Receives files as a map of file paths to file contents

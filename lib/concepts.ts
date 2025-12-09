@@ -240,9 +240,9 @@ export interface RegistryFilesResponse {
  */
 export async function getConceptFiles(uniqueName: string, version?: number): Promise<Record<string, string>> {
     try {
-    const body: { unique_name: string; version?: number } = { unique_name: uniqueName };
-    if (typeof version === 'number') body.version = version;
-    const response = await api.post<RegistryFilesResponse>("/registry/files", body);
+        const body: { unique_name: string; version?: number } = { unique_name: uniqueName };
+        if (typeof version === 'number') body.version = version;
+        const response = await api.post<RegistryFilesResponse>("/registry/files", body);
         return response.data.files || {};
     } catch (error) {
         return {};
@@ -253,9 +253,9 @@ export async function getConceptFiles(uniqueName: string, version?: number): Pro
  * Download a specific version via backend sync (records analytics).
  * Expects server to return { files: Record<string,string> } similar to registry/files.
  */
-export async function downloadConceptVersion(uniqueName: string, version: number, accessToken?: string): Promise<Record<string, string>> {
+export async function downloadConceptVersion(uniqueName: string, version: number, authorUsername: string, accessToken?: string): Promise<Record<string, string>> {
     try {
-    const response = await api.post<{ files: Record<string, string> }>("/concepts/download/version", { unique_name: uniqueName, version, accessToken });
+        const response = await api.post<{ files: Record<string, string> }>("/concepts/download/version", { unique_name: uniqueName, version, author_username: authorUsername, accessToken });
         return response.data.files || {};
     } catch (error) {
         return {};
@@ -349,9 +349,9 @@ export async function getConceptVersions(uniqueName: string): Promise<ConceptReg
     try {
         const conceptId = await getConceptIdByUniqueName(uniqueName);
         if (!conceptId) return [];
-    const response = await api.post<{ versions: { version: number; createdAt: string }[] }[]>('/ConceptRegistering/_getVersions', { concept: conceptId });
-    const arr = response.data[0]?.versions ?? [];
-    return arr.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const response = await api.post<{ versions: { version: number; createdAt: string }[] }[]>('/ConceptRegistering/_getVersions', { concept: conceptId });
+        const arr = response.data[0]?.versions ?? [];
+        return arr.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } catch {
         return [];
     }
