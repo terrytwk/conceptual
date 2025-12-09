@@ -17,7 +17,7 @@ const baseCategories = [
 export function ConceptsSidebar({ selectedCategory, onSelectCategory }: ConceptsSidebarProps) {
     const { isAuthenticated } = useAuth()
     const categories = isAuthenticated
-        ? [...baseCategories, { id: 'liked', label: 'Liked Concepts' }]
+        ? [...baseCategories, { id: 'liked', label: 'Liked Concepts' }, { id: 'yours', label: 'Your Concepts' }]
         : baseCategories
     return (
         <div className="space-y-6">

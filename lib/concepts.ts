@@ -1,6 +1,20 @@
 import { api } from './api';
 import { AxiosError } from 'axios';
 import { getAccessToken } from './auth-storage';
+// Optional UUID generator for request dedupe. In browsers, fallback to time+random.
+let genUUID: () => string = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+try {
+    // Node/Edge runtime may provide crypto.randomUUID
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyCrypto = (globalThis as any).crypto;
+    if (anyCrypto && typeof anyCrypto.randomUUID === 'function') {
+        genUUID = () => anyCrypto.randomUUID();
+    }
+} catch { }
+
+// In-flight guards to prevent duplicate concurrent requests
+const publishInFlight = new Set<string>();
+const readmeGenInFlight = new Set<string>();
 
 /**
  * Concept Registration API functions
@@ -119,7 +133,12 @@ export async function publishConceptWithFolder(
     uniqueName: string,
     files: FileList | File[]
 ): Promise<string> {
+    // Guard: prevent concurrent duplicate publishes for the same uniqueName
+    if (publishInFlight.has(uniqueName)) {
+        throw new Error('A publish is already in progress for this concept. Please wait.');
+    }
     try {
+        publishInFlight.add(uniqueName);
         // Convert files to Uint8Array and create files map
         const fileArray = Array.from(files);
         const filesMap: Record<string, number[]> = {};
@@ -141,6 +160,8 @@ export async function publishConceptWithFolder(
         const requestBody = {
             unique_name: uniqueName,
             files: filesMap,
+            // Include a unique requestId to aid backend idempotency/deduplication
+            requestId: genUUID(),
         };
 
         // Include access token only; do not include concept id here
@@ -151,11 +172,22 @@ export async function publishConceptWithFolder(
         );
         return response.data.version;
     } catch (error) {
+        // Fallback: if the server actually processed the publish but the client errored (e.g., network/timeout),
+        // try to detect the latest version and return it.
+        try {
+            const versions = await getConceptVersions(uniqueName);
+            const latest = versions[0]?.version;
+            if (typeof latest === 'number') {
+                return String(latest);
+            }
+        } catch { }
         if (error instanceof AxiosError && error.response?.data) {
             const apiError = error.response.data as ApiError;
             throw new Error(apiError.error || 'Failed to publish concept');
         }
         throw new Error('Failed to publish concept. Please try again.');
+    } finally {
+        publishInFlight.delete(uniqueName);
     }
 }
 
@@ -250,14 +282,60 @@ export async function getConceptFiles(uniqueName: string, version?: number): Pro
 }
 
 /**
- * Download a specific version via backend sync (records analytics).
- * Expects server to return { files: Record<string,string> } similar to registry/files.
+ * Resolve author username by unique name using registry/all (best-effort).
  */
-export async function downloadConceptVersion(uniqueName: string, version: number, authorUsername: string, accessToken?: string): Promise<Record<string, string>> {
+async function getAuthorUsernameByUniqueName(uniqueName: string): Promise<string | null> {
     try {
-        const response = await api.post<{ files: Record<string, string> }>("/concepts/download/version", { unique_name: uniqueName, version, author_username: authorUsername, accessToken });
-        return response.data.files || {};
-    } catch (error) {
+        const concepts = await getAllConcepts();
+        const match = concepts.find((c) => c.uniqueName === uniqueName);
+        const username = match?.authorUsername?.trim();
+        return username ? username : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Download a specific version via backend sync (records analytics).
+ * Calls the download sync with required author_username; falls back to registry/files on failure.
+ */
+export async function downloadConceptVersion(
+    uniqueName: string,
+    version: number,
+    accessToken?: string
+): Promise<Record<string, string>> {
+    // Try server download sync (records analytics). If it fails, fallback.
+    try {
+        const authorUsername = await getAuthorUsernameByUniqueName(uniqueName);
+        const body: { unique_name: string; version: number; accessToken?: string; author_username?: string } = {
+            unique_name: uniqueName,
+            version,
+        };
+        if (accessToken) body.accessToken = accessToken;
+        if (authorUsername) body.author_username = authorUsername;
+
+        const response = await api.post<{ files: Record<string, string> }>(
+            "/concepts/download/version",
+            body,
+            { timeout: 8000 }
+        );
+        const files = response.data?.files ?? {};
+        if (files && Object.keys(files).length > 0) {
+            return files;
+        }
+        // If empty, try fallback below
+    } catch {
+        // Ignore and try fallback
+    }
+
+    // Fallback: fetch files from registry (no analytics)
+    try {
+        const res = await api.post<RegistryFilesResponse>("/registry/files", {
+            unique_name: uniqueName,
+            version,
+        });
+        return res.data?.files ?? {};
+    } catch {
         return {};
     }
 }
@@ -269,13 +347,14 @@ export async function downloadConceptVersion(uniqueName: string, version: number
 export async function getConceptDownloadCountViaQuery(uniqueName: string): Promise<number> {
     const conceptId = await getConceptIdByUniqueName(uniqueName);
     if (!conceptId) return 0;
-    // Send ISO strings to avoid Date serialization issues
-    const response = await api.post<Array<{ count: number }>>('/DownloadAnalyzing/_countForItem', {
-        item: conceptId,
-        from: new Date(0).toISOString(),
-        to: new Date().toISOString(),
-    });
-    return response.data?.[0]?.count ?? 0;
+    try {
+        const response = await api.post<Array<{ count: number }>>("/DownloadAnalyzing/_countForItem", {
+            item: conceptId,
+        });
+        return response.data?.[0]?.count ?? 0;
+    } catch {
+        return 0;
+    }
 }
 
 /**
@@ -364,4 +443,129 @@ export async function getConceptVersions(uniqueName: string): Promise<ConceptReg
 export async function publishExistingConceptVersion(uniqueName: string, files: FileList | File[]): Promise<string> {
     // Reuse the same endpoint as concept creation; backend handles existing vs new flows
     return publishConceptWithFolder(uniqueName, files);
+}
+
+/**
+ * README API helpers using backend endpoints.
+ * - Generate: /readme/generate (Requesting path)
+ * - Get: /ReadmeGenerating/get
+ * - Update: /ReadmeGenerating/update
+ */
+export async function generateReadmeForConcept(uniqueName: string, overwrite = false, opts?: { files?: Record<string, string>; actions?: string[]; displayName?: string; accessToken?: string }): Promise<{ path: string; content?: string } | null> {
+    try {
+        const conceptId = await getConceptIdByUniqueName(uniqueName);
+        if (!conceptId) return null;
+        // Guard: avoid concurrent duplicate README generations for same concept
+        if (readmeGenInFlight.has(conceptId)) {
+            return null;
+        }
+        readmeGenInFlight.add(conceptId);
+        const payload: any = {
+            concept: conceptId,
+            overwrite,
+            displayName: opts?.displayName ?? uniqueName,
+            files: opts?.files,
+            actions: opts?.actions,
+            accessToken: opts?.accessToken ?? (getAccessToken() || undefined),
+            path: "/readme/generate",
+        };
+        // Use Requesting path to trigger GenerateReadmeFromButton sync
+        await api.post<{ request: string }>("/readme/generate", payload);
+        // Attempt to fetch the README content with a short retry/backoff to reduce empty first fetches
+        let getRes: { data: any } | null = null;
+        const attempts = 3;
+        const delayMs = 300;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                getRes = await api.post<{ path: string; content?: string } | { error: string; path: string }>("/ReadmeGenerating/get", { concept: conceptId });
+                if (getRes && getRes.data && !('error' in getRes.data)) break;
+            } catch { }
+            await new Promise(res => setTimeout(res, delayMs));
+        }
+        if (!getRes) return null;
+        if ('error' in (getRes.data as any)) {
+            return null;
+        }
+        return getRes.data as { path: string; content?: string };
+    } catch {
+        return null;
+    } finally {
+        // Ensure we clear the guard if conceptId was resolved
+        try {
+            const cid = await getConceptIdByUniqueName(uniqueName);
+            if (cid) readmeGenInFlight.delete(cid);
+        } catch { }
+    }
+}
+
+export async function getReadmeForConcept(uniqueName: string): Promise<{ path: string; content?: string } | null> {
+    try {
+        const conceptId = await getConceptIdByUniqueName(uniqueName);
+        if (!conceptId) return null;
+        const res = await api.post<{ path: string; content?: string } | { error: string; path: string }>("/ReadmeGenerating/get", { concept: conceptId });
+        if ('error' in (res.data as any)) return res.data as { path: string };
+        return res.data as { path: string; content?: string };
+    } catch {
+        return null;
+    }
+}
+
+// ConceptId-based variants for stricter backend expectations
+export async function generateReadmeByConceptId(conceptId: string, overwrite = false, opts?: { files?: Record<string, string>; actions?: string[]; displayName?: string; accessToken?: string }): Promise<{ path: string; content?: string } | null> {
+    try {
+        // Guard: avoid concurrent duplicate README generations for same concept
+        if (readmeGenInFlight.has(conceptId)) {
+            return null;
+        }
+        readmeGenInFlight.add(conceptId);
+        const payload: any = {
+            concept: conceptId,
+            overwrite,
+            displayName: opts?.displayName,
+            files: opts?.files,
+            actions: opts?.actions,
+            accessToken: opts?.accessToken ?? (getAccessToken() || undefined),
+            path: "/readme/generate",
+        };
+        await api.post<{ request: string }>("/readme/generate", payload);
+        // Short retry/backoff for get
+        let getRes: { data: any } | null = null;
+        const attempts = 3;
+        const delayMs = 300;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                getRes = await api.post<{ path: string; content?: string } | { error: string; path: string }>("/ReadmeGenerating/get", { concept: conceptId });
+                if (getRes && getRes.data && !('error' in getRes.data)) break;
+            } catch { }
+            await new Promise(res => setTimeout(res, delayMs));
+        }
+        if (!getRes) return null;
+        if ('error' in (getRes.data as any)) return null;
+        return getRes.data as { path: string; content?: string };
+    } catch {
+        return null;
+    } finally {
+        readmeGenInFlight.delete(conceptId);
+    }
+}
+
+export async function getReadmeByConceptId(conceptId: string): Promise<{ path: string; content?: string } | null> {
+    try {
+        const res = await api.post<{ path: string; content?: string } | { error: string; path: string }>("/ReadmeGenerating/get", { concept: conceptId });
+        if ('error' in (res.data as any)) return res.data as { path: string };
+        return res.data as { path: string; content?: string };
+    } catch {
+        return null;
+    }
+}
+
+export async function updateReadmeForConcept(uniqueName: string, content: string): Promise<{ path: string; content: string } | null> {
+    try {
+        const conceptId = await getConceptIdByUniqueName(uniqueName);
+        if (!conceptId) return null;
+        const res = await api.post<{ path: string; content: string }>("/ReadmeGenerating/update", { concept: conceptId, content });
+        return res.data;
+    } catch {
+        return null;
+    }
 }

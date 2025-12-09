@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Box, ThumbsUp, Download, Zap, Loader2 } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery } from '@/lib/concepts'
+import { Box, ThumbsUp, Download, Loader2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { getAllConcepts, type ConceptItem, getConceptDownloadCountViaQuery, getConceptVersions } from '@/lib/concepts'
 import { countForItem, isLiked, like as likeApi, unlike as unlikeApi } from '@/lib/liking'
 import { useAuth } from '@/contexts/auth-context'
 import JSZip from 'jszip'
@@ -13,6 +13,7 @@ interface ConceptsGridProps {
     searchQuery: string
     selectedCategory: string
     refreshKey?: number
+    sortBy?: 'likes_desc' | 'likes_asc' | 'downloads_desc' | 'downloads_asc' | 'date_desc' | 'date_asc'
 }
 
 interface Concept {
@@ -203,7 +204,7 @@ function convertApiConceptToDisplay(apiConcept: ConceptItem): Concept {
     }
 }
 
-export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: ConceptsGridProps) {
+export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey, sortBy = 'date_desc' }: ConceptsGridProps) {
     const [concepts, setConcepts] = useState<Concept[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -234,7 +235,20 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                 }
                 setLikedMap(likedState)
 
-                setConcepts(displayConcepts)
+                // Resolve latest version dates from backend per unique name
+                const updatedWithVersions = await Promise.all(displayConcepts.map(async (c) => {
+                    const uniqueName = c.title.includes('/') ? c.title.split('/').pop()! : c.title
+                    try {
+                        const versions = await getConceptVersions(uniqueName)
+                        const latest = versions[0]
+                        const updatedDate = latest ? new Date(latest.createdAt) : c.updated
+                        return { ...c, updated: updatedDate, versionCount: versions.length }
+                    } catch {
+                        return c
+                    }
+                }))
+
+                setConcepts(updatedWithVersions)
 
                 // Fetch download counts per concept (by uniqueName)
                 const downloadCounts = await Promise.all(
@@ -262,11 +276,53 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
         fetchConcepts()
     }, [refreshKey, isAuthenticated, userId])
 
-    const filteredConcepts = concepts.filter((concept) => {
+    // Compute leaderboard values for badges
+    const maxDownloads = (() => {
+        const nums = Object.values(downloadsMap).filter((v): v is number => typeof v === 'number')
+        return nums.length ? Math.max(...nums) : 0
+    })()
+    const maxLikes = (() => {
+        const nums = Object.values(likesMap)
+        return nums.length ? Math.max(...nums) : 0
+    })()
+
+    let filteredConcepts = concepts.filter((concept) => {
         const matchesSearch = concept.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             concept.description.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true)
+        const isYours = selectedCategory === 'yours' && isAuthenticated && userId && concept.owner === userId
+        const matchesCategory = selectedCategory === 'all' || concept.category === selectedCategory || (selectedCategory === 'liked' && likedMap[concept.id] === true) || isYours
         return matchesSearch && matchesCategory
+    })
+
+    // Apply sorting
+    filteredConcepts = filteredConcepts.slice().sort((a, b) => {
+        switch (sortBy) {
+            case 'likes_desc': {
+                const la = likesMap[a.id] ?? 0
+                const lb = likesMap[b.id] ?? 0
+                return lb - la
+            }
+            case 'likes_asc': {
+                const la = likesMap[a.id] ?? 0
+                const lb = likesMap[b.id] ?? 0
+                return la - lb
+            }
+            case 'downloads_desc': {
+                const da = downloadsMap[a.id] ?? 0
+                const db = downloadsMap[b.id] ?? 0
+                return (db ?? 0) - (da ?? 0)
+            }
+            case 'downloads_asc': {
+                const da = downloadsMap[a.id] ?? 0
+                const db = downloadsMap[b.id] ?? 0
+                return (da ?? 0) - (db ?? 0)
+            }
+            case 'date_asc':
+                return a.updated.getTime() - b.updated.getTime()
+            case 'date_desc':
+            default:
+                return b.updated.getTime() - a.updated.getTime()
+        }
     })
 
     const downloadConcept = async (concept: Concept) => {
@@ -358,71 +414,83 @@ export function ConceptsGrid({ searchQuery, selectedCategory, refreshKey }: Conc
                     </p>
                 </div>
             ) : (
-        <div className="space-y-3">
+                <div className="space-y-3">
                     {filteredConcepts.map((concept) => {
-                        // concept.title formatted as author/uniqueName or uniqueName; extract uniqueName (after last '/')
-                        const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title;
+                        const uniqueName = concept.title.includes('/') ? concept.title.split('/').pop()! : concept.title
+                        const downloads = downloadsMap[concept.id] ?? 0
+                        const likes = likesMap[concept.id] ?? 0
+                        const isPopular = downloads > 0 && downloads === maxDownloads
+                        const isMostLiked = likes > 0 && likes === maxLikes
+
                         return (
-            <div
-                            key={concept.id}
-                            className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
-                        >
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-start gap-3 flex-1">
-                                    <div className="mt-1">
-                                        <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            <div
+                                key={concept.id}
+                                className="group block p-4 rounded-lg border border-border hover:border-primary/50 bg-card hover:bg-card/80 transition-all cursor-pointer"
+                            >
+                                <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-start gap-3 flex-1">
+                                        <div className="mt-1">
+                                            <Box className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <a href={`/concepts/${uniqueName}`} className="font-semibold text-foreground group-hover:text-primary transition-colors hover:underline">
+                                                {concept.title}
+                                            </a>
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                {concept.description}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <a href={`/concepts/${uniqueName}`} className="font-semibold text-foreground group-hover:text-primary transition-colors hover:underline">
-                                            {concept.title}
-                                        </a>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            {concept.description}
-                                        </p>
+                                    {/* Dynamic badges replacing Featured */}
+                                    <div className="flex items-center gap-2 ml-2 shrink-0">
+                                        {isPopular && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
+                                                <Download className="w-3 h-3" />
+                                                Popular
+                                            </div>
+                                        )}
+                                        {isMostLiked && (
+                                            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium">
+                                                <ThumbsUp className="w-3 h-3" />
+                                                Most liked
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                {concept.featured && (
-                                    <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium ml-2 shrink-0">
-                                        <Zap className="w-3 h-3" />
-                                        Featured
-                                    </div>
-                                )}
-                            </div>
 
-                            <div className="flex flex-wrap gap-2 mt-3 mb-3">
-                                {concept.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
-                                    >
-                                        {tag}
+                                <div className="flex flex-wrap gap-2 mt-3 mb-3">
+                                    {concept.tags.map((tag) => (
+                                        <span
+                                            key={tag}
+                                            className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
+                                        >
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>
+                                        {format(concept.updated, 'yyyy-MM-dd HH:mm')}
                                     </span>
-                                ))}
-                            </div>
-
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Updated {formatDistanceToNow(concept.updated, { addSuffix: true })}</span>
-                                <div className="flex gap-4">
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="flex items-center gap-1 text-muted-foreground"
-                                    >
-                                        <Download className="w-3 h-3" />
-                                        <span>{downloadsMap[concept.id] == null ? '~' : downloadsMap[concept.id]}</span>
-                                    </button>
-                                    <button
-                                        onClick={() => toggleLike(concept.id)}
-                                        disabled={!isAuthenticated}
-                                        className={`flex items-center gap-1 ${likedMap[concept.id] ? 'text-primary' : ''}`}
-                                    >
-                                        <ThumbsUp className="w-3 h-3" />
-                                        <span>{(likesMap[concept.id] ?? 0)}</span>
-                                    </button>
+                                    <div className="flex gap-4">
+                                        <button type="button" disabled className="flex items-center gap-1 text-muted-foreground">
+                                            <Download className="w-3 h-3" />
+                                            <span>{downloadsMap[concept.id] == null ? '~' : downloadsMap[concept.id]}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => toggleLike(concept.id)}
+                                            disabled={!isAuthenticated}
+                                            className={`flex items-center gap-1 ${likedMap[concept.id] ? 'text-primary' : ''}`}
+                                        >
+                                            <ThumbsUp className="w-3 h-3" />
+                                            <span>{(likesMap[concept.id] ?? 0)}</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )})}
+                        )
+                    })}
                 </div>
             )}
         </div>
