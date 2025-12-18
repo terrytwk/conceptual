@@ -5,7 +5,6 @@ import { Header } from '@/components/header'
 import { FooterSection } from '@/components/footer-section'
 import { ConceptsSidebar } from '@/components/concepts/sidebar'
 import { ConceptsGrid } from '@/components/concepts/grid'
-import { ConceptsPromo } from '@/components/concepts/promo'
 import { AddConceptDialog } from '@/components/concepts/add-concept-dialog'
 import { Search, ChevronDown, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -76,7 +75,7 @@ export default function ConceptsPage() {
                 </div>
 
                 {/* Main Content */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Sidebar */}
                     <div className="lg:col-span-1">
                         <ConceptsSidebar selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
@@ -92,10 +91,6 @@ export default function ConceptsPage() {
                         />
                     </div>
 
-                    {/* Promo Sidebar */}
-                    <div className="lg:col-span-1">
-                        <ConceptsPromo />
-                    </div>
                 </div>
             </main>
             <div className="mt-16">
